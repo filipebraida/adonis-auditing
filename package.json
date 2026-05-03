@@ -1,7 +1,7 @@
 {
   "name": "@filipebraida/adonis-auditing",
   "description": "Audit your Lucid models with ease (AdonisJS v7).",
-  "version": "2.0.0-alpha.2",
+  "version": "2.0.0-alpha.3",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -42,7 +42,6 @@
     "compile": "tsdown && tsc --emitDeclarationOnly --declaration",
     "postcompile": "npm run copy:templates",
     "build": "npm run compile",
-    "release": "release-it",
     "version": "npm run build",
     "prepublishOnly": "npm run build"
   },
@@ -70,7 +69,6 @@
     "@japa/assert": "^4.2.0",
     "@japa/runner": "^5.3.0",
     "@poppinss/ts-exec": "^1.4.4",
-    "@release-it/conventional-changelog": "^10.0.5",
     "@types/luxon": "^3.4.2",
     "@types/node": "^25.3.5",
     "better-sqlite3": "^11.0.0",
@@ -80,7 +78,6 @@
     "eslint": "^10.0.3",
     "luxon": "^3.4.4",
     "prettier": "^3.8.1",
-    "release-it": "^19.2.4",
     "tsdown": "^0.21.0",
     "typescript": "^5.9.3"
   },
@@ -97,30 +94,6 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "release-it": {
-    "git": {
-      "requireCleanWorkingDir": true,
-      "requireUpstream": true,
-      "commitMessage": "chore(release): ${version}",
-      "tagAnnotation": "v${version}",
-      "push": true,
-      "tagName": "v${version}"
-    },
-    "github": {
-      "release": true
-    },
-    "npm": {
-      "publish": true,
-      "skipChecks": true
-    },
-    "plugins": {
-      "@release-it/conventional-changelog": {
-        "preset": {
-          "name": "angular"
-        }
-      }
-    }
   },
   "c8": {
     "reporter": [
