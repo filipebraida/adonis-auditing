@@ -49,6 +49,14 @@
   "keywords": ["audit", "auditing", "lucid", "adonis", "adonisjs", "history", "log", "tracking"],
   "author": "Filipe Braida <filipebraida@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/filipebraida/adonis-auditing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/filipebraida/adonis-auditing/issues"
+  },
+  "homepage": "https://github.com/filipebraida/adonis-auditing#readme",
   "dependencies": {
     "@poppinss/utils": "^6.7.0",
     "get-tsconfig": "^4.7.3"
