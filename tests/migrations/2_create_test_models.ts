@@ -52,6 +52,22 @@ export default class extends BaseSchema {
       table.timestamp('created_at').nullable()
       table.timestamp('updated_at').nullable()
     })
+
+    this.schema.createTable('trivials', (table) => {
+      table.increments('id').notNullable()
+      table.text('only_col').notNullable()
+      table.timestamp('created_at').nullable()
+      table.timestamp('updated_at').nullable()
+    })
+
+    this.schema.createTable('docs', (table) => {
+      table.increments('id').notNullable()
+      table.text('title').notNullable()
+      table.text('global_noise').nullable()
+      table.text('local_noise').nullable()
+      table.timestamp('created_at').nullable()
+      table.timestamp('updated_at').nullable()
+    })
   }
 
   async down() {
@@ -61,5 +77,7 @@ export default class extends BaseSchema {
     this.schema.dropTable('accounts')
     this.schema.dropTable('sessions')
     this.schema.dropTable('items')
+    this.schema.dropTable('trivials')
+    this.schema.dropTable('docs')
   }
 }

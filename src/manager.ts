@@ -57,4 +57,8 @@ export default class AuditingManager implements AuditingService {
   getHiddenFields(): string[] {
     return this.config.hiddenFields
   }
+
+  getAuditExclude(): string[] {
+    return this.config.auditExclude
+  }
 }

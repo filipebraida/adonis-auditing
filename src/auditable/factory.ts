@@ -82,6 +82,18 @@ export function withAuditable() {
         this.$auditDirtyKeys = Object.keys(this.$dirty)
       }
 
+      async $applyGlobalExclude(obj: Record<string, unknown>): Promise<Record<string, unknown>> {
+        await ModelWithAudit.#lazyServices()
+        const exclude = ModelWithAudit.#auditing!.getAuditExclude()
+        if (exclude.length === 0) return obj
+        const set = new Set(exclude)
+        const out: Record<string, unknown> = {}
+        for (const k of Object.keys(obj)) {
+          if (!set.has(k)) out[k] = obj[k]
+        }
+        return out
+      }
+
       static #emitter?: EmitterService
       static #auditing?: AuditingService
 
@@ -155,10 +167,12 @@ export function withAuditable() {
       static async __auditAfterCreate(model: ModelWithAudit) {
         const ctor = model.constructor as typeof ModelWithAudit
         const filtered = ctor.filterAuditAttributes(model.$attributes)
+        const final = await model.$applyGlobalExclude(filtered)
+        if (Object.keys(final).length === 0) return
         await model.$writeAudit({
           event: 'created',
           oldValues: null,
-          newValues: filtered,
+          newValues: final,
           tags: ['mutation'],
         })
       }
@@ -183,12 +197,14 @@ export function withAuditable() {
 
         const oldFiltered = ctor.filterAuditAttributes(oldRaw)
         const newFiltered = ctor.filterAuditAttributes(newRaw)
-        if (Object.keys(newFiltered).length === 0) return
+        const oldFinal = await model.$applyGlobalExclude(oldFiltered)
+        const newFinal = await model.$applyGlobalExclude(newFiltered)
+        if (Object.keys(newFinal).length === 0) return
 
         await model.$writeAudit({
           event: 'updated',
-          oldValues: oldFiltered,
-          newValues: newFiltered,
+          oldValues: oldFinal,
+          newValues: newFinal,
           tags: ['mutation'],
         })
       }
@@ -202,9 +218,11 @@ export function withAuditable() {
       static async __auditAfterDelete(model: ModelWithAudit) {
         const ctor = model.constructor as typeof ModelWithAudit
         const filtered = ctor.filterAuditAttributes(model.$auditValuesToSave)
+        const final = await model.$applyGlobalExclude(filtered)
+        if (Object.keys(final).length === 0) return
         await model.$writeAudit({
           event: 'deleted',
-          oldValues: filtered,
+          oldValues: final,
           newValues: null,
           tags: ['mutation'],
         })

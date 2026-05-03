@@ -37,14 +37,47 @@ export default class Post extends compose(BaseModel, Auditable) {
   // Or whitelist (wins over auditExclude when both set):
   // static auditInclude = ['title', 'status']
 
+  // Mask values with '******' instead of dropping — preserves the
+  // event of change but hides the value:
+  static auditMask = ['password']
+
   @column({ isPrimary: true }) declare id: number
   @column() declare title: string
   @column() declare status: 'draft' | 'published'
   @column() declare secret: string | null
+  @column() declare password: string
 }
 ```
 
 Create / update / delete are now recorded in the `audits` table. Updates store only the changed fields (diff).
+
+## Project-wide selectivity
+
+The same selectivity options exist at the config level. Globals are unioned with per-model declarations:
+
+```ts
+import { defineConfig } from 'adonis-auditing'
+
+export default defineConfig({
+  userResolver: () => import('#audit_resolvers/user_resolver'),
+  resolvers: { /* ... */ },
+
+  // Drop these from every audit (project-wide). Useful for noise
+  // columns like `updatedAt`/`createdAt`. Does not apply to
+  // auditCustom payloads.
+  auditExclude: ['updatedAt', 'createdAt'],
+
+  // Mask these with '******' in every audit, including auditCustom.
+  // Use for cross-cutting sensitive fields.
+  hiddenFields: ['password', 'apiKey'],
+})
+```
+
+Precedence when a field appears in multiple lists:
+
+- `auditInclude` is allow-list — anything not listed is dropped, regardless of other settings.
+- `auditExclude` (per-model or global) drops the field; mask never sees it.
+- `hiddenFields` / `auditMask` mask whatever survives the exclude step.
 
 ## Custom domain events
 
