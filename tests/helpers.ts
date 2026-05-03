@@ -5,7 +5,7 @@ import AuditingProvider from '../providers/auditing_provider.js'
 
 const BASE_URL = new URL('../', import.meta.url)
 
-export async function setupApp() {
+export async function setupApp(opts: { hiddenFields?: string[] } = {}) {
   const ignitor = new IgnitorFactory()
     .merge({
       rcFileContents: {
@@ -35,6 +35,7 @@ export async function setupApp() {
             },
           }),
           resolvers: {},
+          hiddenFields: opts.hiddenFields,
         }),
       },
     })

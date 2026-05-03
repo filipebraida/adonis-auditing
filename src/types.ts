@@ -11,16 +11,19 @@ export interface Resolver {
 export interface AuditingConfig {
   userResolver: () => Promise<{ default: new () => UserResolver }>
   resolvers: Record<string, () => Promise<{ default: new () => Resolver }>>
+  hiddenFields?: string[]
 }
 
 export interface ResolvedAuditingConfig {
   userResolver: UserResolver
   resolvers: Record<string, Resolver>
+  hiddenFields: string[]
 }
 
 export interface AuditingService {
   getUserForContext(): Promise<{ id: string; type: string } | null>
   getMetadataForContext(): Promise<Record<string, unknown>>
+  getHiddenFields(): string[]
   isDisabled(): boolean
   disabled<T>(callback: () => Promise<T>): Promise<T>
 }

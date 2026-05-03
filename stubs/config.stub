@@ -10,5 +10,13 @@ export default defineConfig({
     user_agent: () => import('#audit_resolvers/user_agent_resolver'),
     url: () => import('#audit_resolvers/url_resolver'),
   },
+
+  /**
+   * Field names whose values are replaced with '******' in audit rows.
+   * Use this for sensitive data (passwords, tokens) where you still want
+   * the *event* of change recorded but not the value itself. Per-model
+   * masking is also available via `static auditMask = [...]` on the model.
+   */
+  hiddenFields: [],
 })
 

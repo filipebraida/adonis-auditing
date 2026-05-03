@@ -53,4 +53,8 @@ export default class AuditingManager implements AuditingService {
         .filter((value): value is readonly [string, unknown] => value !== null)
     )
   }
+
+  getHiddenFields(): string[] {
+    return this.config.hiddenFields
+  }
 }

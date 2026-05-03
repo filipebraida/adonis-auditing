@@ -19,6 +19,7 @@ export function withAuditable() {
       static auditableName?: string
       static auditExclude: string[] = []
       static auditInclude: string[] = []
+      static auditMask: string[] = []
 
       static resolveAuditableName(): string {
         return this.auditableName ?? this.name
@@ -89,10 +90,12 @@ export function withAuditable() {
           const mod = await import('@adonisjs/core/services/emitter')
           ModelWithAudit.#emitter = mod.default
         }
-        if (!ModelWithAudit.#auditing) {
-          const mod = await import('../../services/auditing.js')
-          ModelWithAudit.#auditing = mod.default
-        }
+        // Tests boot multiple apps; caching the manager reference would alias
+        // to the first boot. Dynamic import + per-call resolve returns the
+        // current app's singleton.
+        const appModule = await import('@adonisjs/core/services/app')
+        const app = appModule.default
+        ModelWithAudit.#auditing = await app.container.make('auditing.manager')
       }
 
       async $writeAudit(opts: {
@@ -108,18 +111,32 @@ export function withAuditable() {
         const user = await ModelWithAudit.#auditing!.getUserForContext()
         const ctxMeta = await ModelWithAudit.#auditing!.getMetadataForContext()
 
+        const ctor = this.constructor as typeof ModelWithAudit
+        const masked = new Set<string>([
+          ...ModelWithAudit.#auditing!.getHiddenFields(),
+          ...ctor.auditMask,
+        ])
+        const maskValues = (obj: Record<string, unknown> | null) => {
+          if (!obj || masked.size === 0) return obj
+          const out: Record<string, unknown> = {}
+          for (const k of Object.keys(obj)) {
+            out[k] = masked.has(k) ? '******' : obj[k]
+          }
+          return out
+        }
+
         const audit = new Audit()
         audit.userType = user?.type ?? null
         audit.userId = user?.id ?? null
         audit.event = opts.event
-        audit.auditableType = (this.constructor as typeof ModelWithAudit).resolveAuditableName()
+        audit.auditableType = ctor.resolveAuditableName()
         audit.auditableId = (this as any).id
-        audit.oldValues = opts.oldValues
-        audit.newValues = opts.newValues
+        audit.oldValues = maskValues(opts.oldValues)
+        audit.newValues = maskValues(opts.newValues)
         const extraTags = await this.auditTags()
         const mergedTags = [...(opts.tags ?? []), ...extraTags]
         audit.tags = mergedTags.length > 0 ? mergedTags : null
-        audit.metadata = { ...ctxMeta, ...(opts.metadata ?? {}) }
+        audit.metadata = maskValues({ ...ctxMeta, ...(opts.metadata ?? {}) })!
 
         if (this.$trx) {
           audit.useTransaction(this.$trx)
