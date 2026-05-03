@@ -52,8 +52,7 @@ jobs:
       - name: Install
         run: npm install
 
-      - name: Publish to npm with provenance
+      - name: Publish to npm via Trusted Publishing
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TAG: ${{ steps.tag.outputs.npm_tag }}
         run: npm publish --access public --provenance --tag "$NPM_TAG"
