@@ -230,6 +230,30 @@ export default class MyUserResolver implements UserResolver {
 }
 ```
 
+## Troubleshooting
+
+### Warning: `adonis-auditing: cannot read HttpContext (asyncLocalStorage disabled?)`
+
+This shows up in your logs when an audit fires outside an HTTP request — e.g., from a queue worker, an ace command, a seeder, or any code path where `HttpContext.get()` returns nothing. The audit row is still written; only the user resolution is skipped, so `user_id` / `user_type` end up null on those rows.
+
+Two common causes:
+
+**1. AsyncLocalStorage is disabled.** AdonisJS uses AsyncLocalStorage to keep `HttpContext` reachable from anywhere inside a request. Make sure it's enabled in `config/app.ts`:
+
+```ts
+import { defineConfig } from '@adonisjs/core/app'
+
+export default defineConfig({
+  http: {
+    useAsyncLocalStorage: true,
+  },
+})
+```
+
+**2. The code genuinely runs outside an HTTP request.** For workers, scripts, or CLI commands, there is no request to attach a user to. Either accept the null-user audit row, or suppress the audit entirely with `auditing.disabled(...)` (see "Skipping audits" above).
+
+If you want a non-HTTP audit to still record an actor (e.g., a "system" user), use `auditCustom` and write the actor explicitly via `metadata`, since the resolver path requires `HttpContext`.
+
 ## License
 
 MIT.
