@@ -42,6 +42,10 @@ export function withAuditable() {
 
       $isAuditDisabled = false
 
+      auditTags(): string[] | Promise<string[]> {
+        return []
+      }
+
       async withoutAudit<R>(callback: () => Promise<R>): Promise<R> {
         const prev = this.$isAuditDisabled
         this.$isAuditDisabled = true
@@ -112,7 +116,9 @@ export function withAuditable() {
         audit.auditableId = (this as any).id
         audit.oldValues = opts.oldValues
         audit.newValues = opts.newValues
-        audit.tags = opts.tags ?? null
+        const extraTags = await this.auditTags()
+        const mergedTags = [...(opts.tags ?? []), ...extraTags]
+        audit.tags = mergedTags.length > 0 ? mergedTags : null
         audit.metadata = { ...ctxMeta, ...(opts.metadata ?? {}) }
 
         if (this.$trx) {

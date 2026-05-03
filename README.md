@@ -63,6 +63,36 @@ await post.auditCustom('published', {
 })
 ```
 
+## Tagging audits
+
+Override `auditTags()` to attach extra tags to every audit emitted by a model — anything you want to filter or group by later (tenant scoping, severity flags, domain categories, ...). One common case is linking child records back to a parent in 1-N relationships:
+
+```ts
+class OrderItem extends compose(BaseModel, Auditable) {
+  @column() declare orderId: number
+
+  override auditTags() {
+    return [`order:${this.orderId}`]
+  }
+}
+```
+
+These tags are appended to whatever the call site provides:
+
+```ts
+await item.save()                                     // tags: ['mutation', 'order:42']
+await item.auditCustom('shipped', { tags: ['ship'] }) // tags: ['ship', 'order:42']
+```
+
+Query across the parent's lifetime in one shot — `tags` is a JSON column, so use the operator your driver supports:
+
+```ts
+// Postgres
+await Audit.query().whereRaw(`tags @> ?::jsonb`, [JSON.stringify(['order:42'])])
+```
+
+`auditTags()` may also be `async`, in case you need to await something.
+
 ## Skipping audits
 
 ```ts
@@ -115,7 +145,7 @@ The `audits` table:
 | `auditable_id` | bigint | The audited entity's id |
 | `old_values` | jsonb, nullable | Diff (update) or full snapshot (delete) or null (create) |
 | `new_values` | jsonb, nullable | Diff (update) or full snapshot (create) or null (delete) |
-| `tags` | jsonb, nullable | Array of strings — auto-tagged `['mutation']` for CRUD |
+| `tags` | jsonb, nullable | Array of strings — `['mutation']` for CRUD, plus per-call `auditCustom` tags and any `auditTags()` overrides |
 | `metadata` | jsonb, nullable | Bag from resolvers (ip, user-agent, url, ...) plus per-call extras |
 | `created_at`, `updated_at` | timestamptz | |
 
