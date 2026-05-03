@@ -1,4 +1,4 @@
-import { HttpContext } from '@adonisjs/core/http'
+import type { HttpContext } from '@adonisjs/core/http'
 
 export interface UserResolver {
   resolve(ctx: HttpContext): Promise<{ id: string; type: string } | null>
@@ -21,4 +21,13 @@ export interface ResolvedAuditingConfig {
 export interface AuditingService {
   getUserForContext(): Promise<{ id: string; type: string } | null>
   getMetadataForContext(): Promise<Record<string, unknown>>
+  isDisabled(): boolean
+  disabled<T>(callback: () => Promise<T>): Promise<T>
+}
+
+export interface AuditCustomPayload {
+  old?: Record<string, unknown>
+  new?: Record<string, unknown>
+  tags?: string[]
+  metadata?: Record<string, unknown>
 }

@@ -1,9 +1,9 @@
-export type EventType = 'create' | 'update' | 'delete'
-type AuditEventType = `audit:${EventType}`
-type AuditEventsList = {
-  [key in AuditEventType]: number
-}
+import type Audit from '../audit.js'
 
 declare module '@adonisjs/core/types' {
-  interface EventsList extends AuditEventsList {}
+  interface EventsList {
+    'audit:created': { audit: Audit }
+  }
 }
+
+export {}

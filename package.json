@@ -1,116 +1,101 @@
 {
-  "name": "@stouder-io/adonis-auditing",
-  "description": "Audit your Lucid models with ease.",
-  "version": "1.1.8",
+  "name": "adonis-auditing",
+  "description": "Audit your Lucid models with ease (AdonisJS v7).",
+  "version": "2.0.0-alpha.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "type": "module",
   "files": [
-    "build"
+    "build",
+    "!build/bin",
+    "!build/tests"
   ],
+  "main": "build/index.js",
   "exports": {
-    ".": "./build/index.js",
-    "./services/main": "./build/services/auditing.js",
-    "./auditing_provider": "./build/providers/auditing_provider.js",
-    "./types": "./build/src/types.js"
+    ".": {
+      "types": "./build/index.d.ts",
+      "import": "./build/index.js"
+    },
+    "./services/main": {
+      "types": "./build/services/auditing.d.ts",
+      "import": "./build/services/auditing.js"
+    },
+    "./auditing_provider": {
+      "types": "./build/providers/auditing_provider.d.ts",
+      "import": "./build/providers/auditing_provider.js"
+    },
+    "./types": {
+      "types": "./build/src/types.d.ts",
+      "import": "./build/src/types.js"
+    }
   },
   "scripts": {
-    "clean": "del-cli build",
-    "copy:templates": "copyfiles --up 1 \"stubs/**/*.stub\" build",
+    "copy:templates": "copyfiles \"stubs/**/*.stub\" build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext=.ts",
+    "lint": "eslint .",
     "format": "prettier --write .",
-    "quick:test": "node --import=./tsnode.esm.js --enable-source-maps bin/test.ts",
+    "quick:test": "node --import=@poppinss/ts-exec --enable-source-maps bin/test.ts",
     "pretest": "npm run lint",
     "test": "c8 npm run quick:test",
-    "prebuild": "npm run lint && npm run clean",
-    "build": "tsup",
-    "postbuild": "npm run copy:templates",
+    "precompile": "npm run lint",
+    "compile": "tsdown && tsc --emitDeclarationOnly --declaration",
+    "postcompile": "npm run copy:templates",
+    "build": "npm run compile",
+    "release": "release-it",
     "version": "npm run build",
-    "prepublishOnly": "npm run build",
-    "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [
-    "accountability",
-    "audit",
-    "auditing",
-    "changes",
-    "lucid",
-    "history",
-    "log",
-    "logging",
-    "observer",
-    "adonis",
-    "adonisjs",
-    "record",
-    "revision",
-    "tracking"
-  ],
-  "author": "Xavier Stouder <xavier@stouder.io> (https://stouder.io)",
+  "keywords": ["audit", "auditing", "lucid", "adonis", "adonisjs", "history", "log", "tracking"],
+  "author": "Filipe Braida <filipebraida@gmail.com>",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/StouderIO/adonis-auditing.git"
-  },
-  "bugs": {
-    "url": "https://github.com/StouderIO/adonis-auditing/issues"
+  "dependencies": {
+    "@poppinss/utils": "^6.7.0",
+    "get-tsconfig": "^4.7.3"
   },
   "devDependencies": {
-    "@adonisjs/assembler": "^7.2.3",
-    "@adonisjs/auth": "^9.1.1",
-    "@adonisjs/core": "^6.3.1",
-    "@adonisjs/eslint-config": "^1.2.2",
-    "@adonisjs/lucid": "^20.3.0",
-    "@adonisjs/prettier-config": "^1.2.2",
-    "@adonisjs/tsconfig": "^1.2.2",
-    "@japa/assert": "^2.1.0",
-    "@japa/file-system": "^2.2.0",
-    "@japa/runner": "^3.1.1",
-    "@swc/core": "^1.4.2",
+    "@adonisjs/assembler": "^8.0.0",
+    "@adonisjs/core": "^7.0.0",
+    "@adonisjs/eslint-config": "^3.0.0",
+    "@adonisjs/lucid": "^22.0.0",
+    "@adonisjs/prettier-config": "^1.4.5",
+    "@adonisjs/tsconfig": "^2.0.0",
+    "@japa/assert": "^4.2.0",
+    "@japa/runner": "^5.3.0",
+    "@poppinss/ts-exec": "^1.4.4",
+    "@release-it/conventional-changelog": "^10.0.5",
     "@types/luxon": "^3.4.2",
-    "@types/node": "^20.11.24",
-    "better-sqlite3": "^9.4.3",
-    "c8": "^9.1.0",
+    "@types/node": "^25.3.5",
+    "better-sqlite3": "^11.0.0",
+    "c8": "^11.0.0",
     "copyfiles": "^2.4.1",
-    "del-cli": "^5.1.0",
-    "eslint": "^8.57.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^10.0.3",
     "luxon": "^3.4.4",
-    "prettier": "^3.2.5",
-    "ts-node": "^10.9.2",
-    "tsup": "^8.0.2",
-    "typescript": "^5.3.3",
-    "vitepress": "1.0.0-rc.45"
+    "prettier": "^3.8.1",
+    "release-it": "^19.2.4",
+    "tsdown": "^0.21.0",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "@adonisjs/auth": "^9.1.1",
-    "@adonisjs/core": "^6.2.0",
-    "@adonisjs/lucid": "^20.3.0 || ^21.0.0",
+    "@adonisjs/core": "^7.0.0",
+    "@adonisjs/assembler": "^8.0.0",
+    "@adonisjs/lucid": "^22.0.0",
     "luxon": "^3.4.4"
+  },
+  "peerDependenciesMeta": {
+    "@adonisjs/assembler": {
+      "optional": true
+    }
   },
   "publishConfig": {
     "access": "public",
-    "tag": "latest"
+    "provenance": true
   },
-  "c8": {
-    "reporter": [
-      "text",
-      "html"
-    ],
-    "exclude": [
-      "tests/**",
-      "tests_helpers/**"
-    ]
-  },
-  "eslintConfig": {
-    "extends": "@adonisjs/eslint-config/package"
-  },
-  "prettier": "@adonisjs/prettier-config",
-  "dependencies": {
-    "get-tsconfig": "^4.7.3"
-  },
-  "tsup": {
+  "tsdown": {
     "entry": [
       "./index.ts",
+      "./configure.ts",
       "./services/auditing.ts",
       "./providers/auditing_provider.ts",
       "./src/types.ts",
@@ -119,10 +104,45 @@
     "outDir": "./build",
     "clean": true,
     "format": "esm",
-    "dts": true,
+    "minify": "dce-only",
+    "fixedExtension": false,
+    "dts": false,
+    "treeshake": false,
+    "sourcemaps": false,
     "target": "esnext"
   },
-  "volta": {
-    "node": "21.7.3"
-  }
+  "release-it": {
+    "git": {
+      "requireCleanWorkingDir": true,
+      "requireUpstream": true,
+      "commitMessage": "chore(release): ${version}",
+      "tagAnnotation": "v${version}",
+      "push": true,
+      "tagName": "v${version}"
+    },
+    "github": {
+      "release": true
+    },
+    "npm": {
+      "publish": true,
+      "skipChecks": true
+    },
+    "plugins": {
+      "@release-it/conventional-changelog": {
+        "preset": {
+          "name": "angular"
+        }
+      }
+    }
+  },
+  "c8": {
+    "reporter": [
+      "text",
+      "html"
+    ],
+    "exclude": [
+      "tests/**"
+    ]
+  },
+  "prettier": "@adonisjs/prettier-config"
 }

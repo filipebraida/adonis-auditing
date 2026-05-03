@@ -1,6 +1,12 @@
-import { DateTime } from 'luxon'
+import type { DateTime } from 'luxon'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
-import { ModelObject } from '@adonisjs/lucid/types/model'
+import type { ModelObject } from '@adonisjs/lucid/types/model'
+
+const jsonColumn = {
+  consume: (value: string | null) => (value ? JSON.parse(value) : null),
+  prepare: (value: unknown) => (value ? JSON.stringify(value) : null),
+  serialize: (value: unknown) => (value ? value : null),
+}
 
 export default class Audit extends BaseModel {
   @column({ isPrimary: true })
@@ -13,7 +19,7 @@ export default class Audit extends BaseModel {
   declare userId: string | null
 
   @column()
-  declare event: 'create' | 'update' | 'delete'
+  declare event: string
 
   @column()
   declare auditableType: string
@@ -21,25 +27,16 @@ export default class Audit extends BaseModel {
   @column()
   declare auditableId: number
 
-  @column({
-    consume: (value) => (value ? JSON.parse(value) : null),
-    prepare: (value) => (value ? JSON.stringify(value) : null),
-    serialize: (value) => (value ? value : null),
-  })
+  @column(jsonColumn)
   declare oldValues: ModelObject | null
 
-  @column({
-    consume: (value) => (value ? JSON.parse(value) : null),
-    prepare: (value) => (value ? JSON.stringify(value) : null),
-    serialize: (value) => (value ? value : null),
-  })
+  @column(jsonColumn)
   declare newValues: ModelObject | null
 
-  @column({
-    consume: (value) => (value ? JSON.parse(value) : null),
-    prepare: (value) => (value ? JSON.stringify(value) : null),
-    serialize: (value) => (value ? value : null),
-  })
+  @column(jsonColumn)
+  declare tags: string[] | null
+
+  @column(jsonColumn)
   declare metadata: ModelObject | null
 
   @column.dateTime({ autoCreate: true })

@@ -1,8 +1,8 @@
 {{{
-  exports({ to: app.makePath(path, 'url_resolver.ts') })
+  exports({ to: path + '/url_resolver.ts' })
 }}}
 import { HttpContext } from '@adonisjs/core/http'
-import { Resolver } from '@stouder-io/adonis-auditing'
+import type { Resolver } from 'adonis-auditing/types'
 
 export default class UrlResolver implements Resolver {
   async resolve(ctx: HttpContext) {

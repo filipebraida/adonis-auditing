@@ -1,45 +1,174 @@
-> [!WARNING]
-> @stouder-io/adonis-auditing moved to @adogrove/adonis-auditing, please see [https://adogrove.stouder.io/](https://adogrove.stouder.io/)
+# adonis-auditing
 
-<div align="center">
-  <h3>@stouder-io/adonis-auditing</h3>
-  <p>Audit your Lucid models with ease.</p>
-  <a href="https://www.npmjs.com/package/@stouder-io/adonis-auditing">
-    <img src="https://img.shields.io/npm/v/@stouder-io/adonis-auditing.svg?style=for-the-badge&logo=npm" />
-  </a>
-  <img src="https://img.shields.io/npm/l/@stouder-io/adonis-auditing?color=blueviolet&style=for-the-badge" />
-  <img alt="npm" src="https://img.shields.io/npm/dt/@stouder-io/adonis-auditing?style=for-the-badge">
-  <img alt="All Contributors" src="https://img.shields.io/github/all-contributors/StouderIO/adonis-auditing?color=ee8449&style=for-the-badge">
-</div>
+Audit your Lucid models with ease — AdonisJS v7 edition.
 
-# Official Documentation
-For more information, please refer to the [official documentation](https://adonis-auditing.stouder.io/).
+A maintained MIT continuation of [`@stouder-io/adonis-auditing`](https://github.com/StouderIO/adonis-auditing) (v1.1.8, MIT, archived), modernized for AdonisJS v7 and extended with custom domain events, transaction awareness, diff-only updates, polymorphic actor support, and tag-based categorization.
 
-## Contributors ✨
+> **Why this fork?** The original project's successor (`@adogrove/adonis-auditing`) was relicensed to AGPL-3.0-or-later, which is unworkable for many production projects. This package keeps the MIT license.
 
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+## Install
 
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://stouder.io"><img src="https://avatars.githubusercontent.com/u/2575182?v=4?s=100" width="100px;" alt="Xavier Stouder"/><br /><sub><b>Xavier Stouder</b></sub></a><br /><a href="https://github.com/StouderIO/adonis-auditing/commits?author=Xstoudi" title="Code">💻</a> <a href="https://github.com/StouderIO/adonis-auditing/commits?author=Xstoudi" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Julien-R44"><img src="https://avatars.githubusercontent.com/u/8337858?v=4?s=100" width="100px;" alt="Julien Ripouteau"/><br /><sub><b>Julien Ripouteau</b></sub></a><br /><a href="#question-Julien-R44" title="Answering Questions">💬</a></td>
-    </tr>
-  </tbody>
-</table>
+```bash
+node ace add adonis-auditing
+```
 
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
+This registers the provider, scaffolds `config/auditing.ts`, the `audits` migration, and four default resolvers (`user`, `ip_address`, `user_agent`, `url`) under `app/audit_resolvers/`.
 
-<!-- ALL-CONTRIBUTORS-LIST:END -->
+Then run the migration:
 
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+```bash
+node ace migration:run
+```
 
-## Special thanks
-* Laravel Auditing package for the inspiration.
+## Make a model auditable
 
-# License
-This project is open-sourced software licensed under the [MIT license](LICENSE.md).
+```ts
+import { compose } from '@adonisjs/core/helpers'
+import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { Auditable } from 'adonis-auditing'
+
+export default class Post extends compose(BaseModel, Auditable) {
+  // Optional: override the value stored in audits.auditable_type
+  static auditableName = 'post'
+
+  // Skip these fields from any automatic CRUD audit
+  static auditExclude = ['secret']
+
+  // Or whitelist (wins over auditExclude when both set):
+  // static auditInclude = ['title', 'status']
+
+  @column({ isPrimary: true }) declare id: number
+  @column() declare title: string
+  @column() declare status: 'draft' | 'published'
+  @column() declare secret: string | null
+}
+```
+
+Create / update / delete are now recorded in the `audits` table. Updates store only the changed fields (diff).
+
+## Custom domain events
+
+Beyond CRUD, record arbitrary events — state transitions, views, exports, anything:
+
+```ts
+// Pure event, no diff
+await post.auditCustom('viewed', { tags: ['view'] })
+
+// State transition with explicit before/after
+await post.auditCustom('published', {
+  old: { status: 'draft' },
+  new: { status: 'published' },
+  tags: ['state'],
+  metadata: { reason: 'editorial approval' },
+})
+```
+
+## Skipping audits
+
+```ts
+// Per instance:
+await post.withoutAudit(async () => {
+  post.viewCount += 1
+  await post.save()
+})
+
+// Globally (e.g., seeders, bulk migrations):
+import auditing from 'adonis-auditing/services/main'
+await auditing.disabled(async () => {
+  await User.createMany(megaSeed)
+})
+```
+
+## Reading the history
+
+```ts
+const timeline = await post.audits().orderBy('id', 'desc')
+const stateChanges = await post.audits().where('event', 'published')
+const recentViews = await post.audits().where('event', 'viewed').limit(20)
+```
+
+`post.audits()` returns a Lucid `ModelQueryBuilder<Audit>` — the full Lucid query API is available.
+
+## Reacting to audits
+
+```ts
+import emitter from '@adonisjs/core/services/emitter'
+
+emitter.on('audit:created', ({ audit }) => {
+  if (audit.event === 'published') {
+    // notify, propagate, send a webhook, etc.
+  }
+})
+```
+
+## Schema
+
+The `audits` table:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigserial | PK |
+| `user_type` | text, nullable | Polymorphic actor type (model name, `'system'`, etc.) |
+| `user_id` | text, nullable | Polymorphic actor id (string supports UUIDs and `'system'`) |
+| `event` | text | Free-form (`'created'`, `'updated'`, `'deleted'`, `'published'`, `'viewed'`, ...) |
+| `auditable_type` | text | From `static auditableName`, defaults to class name |
+| `auditable_id` | bigint | The audited entity's id |
+| `old_values` | jsonb, nullable | Diff (update) or full snapshot (delete) or null (create) |
+| `new_values` | jsonb, nullable | Diff (update) or full snapshot (create) or null (delete) |
+| `tags` | jsonb, nullable | Array of strings — auto-tagged `['mutation']` for CRUD |
+| `metadata` | jsonb, nullable | Bag from resolvers (ip, user-agent, url, ...) plus per-call extras |
+| `created_at`, `updated_at` | timestamptz | |
+
+Indexes: `(auditable_type, auditable_id)`, `(user_type, user_id)`, `(event)`, `(created_at DESC)`.
+
+## Configuration
+
+Edit `config/auditing.ts` to plug in custom resolvers:
+
+```ts
+import { defineConfig } from 'adonis-auditing'
+
+export default defineConfig({
+  userResolver: () => import('#audit_resolvers/user_resolver'),
+  resolvers: {
+    ip_address: () => import('#audit_resolvers/ip_address_resolver'),
+    user_agent: () => import('#audit_resolvers/user_agent_resolver'),
+    url: () => import('#audit_resolvers/url_resolver'),
+    // tenant_id: () => import('#audit_resolvers/tenant_id_resolver'),
+  },
+})
+```
+
+Each resolver implements:
+
+```ts
+import { HttpContext } from '@adonisjs/core/http'
+import type { Resolver } from 'adonis-auditing/types'
+
+export default class TenantIdResolver implements Resolver {
+  async resolve(ctx: HttpContext) {
+    return ctx.request.header('x-tenant-id')
+  }
+}
+```
+
+The user resolver is special — it returns `{ id: string, type: string } | null`:
+
+```ts
+import { HttpContext } from '@adonisjs/core/http'
+import type { UserResolver } from 'adonis-auditing/types'
+
+export default class MyUserResolver implements UserResolver {
+  async resolve(ctx: HttpContext) {
+    const user = ctx.auth.user
+    if (!user) return null
+    return { type: user.constructor.name, id: String(user.id) }
+  }
+}
+```
+
+## License
+
+MIT.
+
+Originally based on [`@stouder-io/adonis-auditing`](https://github.com/StouderIO/adonis-auditing) (MIT). The successor `@adogrove/adonis-auditing` (AGPL-3.0-or-later) is **not** related to this project.

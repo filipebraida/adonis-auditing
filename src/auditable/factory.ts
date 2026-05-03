@@ -1,164 +1,192 @@
-import { EmitterService } from '@adonisjs/core/types'
+import type { BaseModel } from '@adonisjs/lucid/orm'
 import {
-  afterCreate,
-  afterDelete,
-  afterUpdate,
-  BaseModel,
   beforeCreate,
-  beforeDelete,
+  afterCreate,
   beforeUpdate,
+  afterUpdate,
+  beforeDelete,
+  afterDelete,
 } from '@adonisjs/lucid/orm'
+import type { ModelObject } from '@adonisjs/lucid/types/model'
+import type { EmitterService } from '@adonisjs/core/types'
+import type { AuditCustomPayload, AuditingService } from '../types.js'
+import type { NormalizeConstructor } from '../utils/normalized_constructor.js'
 import Audit from '../audit.js'
-import {
-  E_AUDITABLE_CANNOT_REVERT,
-  E_AUDITABLE_INCOMPATIBLE_ATTRIBUTES,
-  E_AUDITABLE_LOAD_NULL,
-  E_AUDITABLE_WRONG_INSTANCE,
-  E_AUDITABLE_WRONG_TYPE,
-} from '../errors.js'
-import { ModelObject } from '@adonisjs/lucid/types/model'
-import { NormalizeConstructor } from '../utils/normalized_constructor.js'
-import { EventType } from './events.js'
-import type { AuditingService } from '../types.js'
-
-export interface AuditsCursor extends Promise<Audit[]> {
-  first: () => Promise<Audit | null>
-  last: () => Promise<Audit | null>
-}
 
 export function withAuditable() {
   return <T extends NormalizeConstructor<typeof BaseModel>>(superclass: T) => {
     class ModelWithAudit extends superclass {
-      static innerEmitter: EmitterService
-      static innerAuditing: AuditingService
+      static auditableName?: string
+      static auditExclude: string[] = []
+      static auditInclude: string[] = []
+
+      static resolveAuditableName(): string {
+        return this.auditableName ?? this.name
+      }
+
+      static filterAuditAttributes(attrs: Record<string, unknown>): Record<string, unknown> {
+        if (this.auditInclude.length > 0) {
+          const out: Record<string, unknown> = {}
+          for (const key of this.auditInclude) {
+            if (key in attrs) out[key] = attrs[key]
+          }
+          return out
+        }
+        if (this.auditExclude.length > 0) {
+          const out: Record<string, unknown> = { ...attrs }
+          for (const key of this.auditExclude) delete out[key]
+          return out
+        }
+        return { ...attrs }
+      }
+
+      $isAuditDisabled = false
+
+      async withoutAudit<R>(callback: () => Promise<R>): Promise<R> {
+        const prev = this.$isAuditDisabled
+        this.$isAuditDisabled = true
+        try {
+          return await callback()
+        } finally {
+          this.$isAuditDisabled = prev
+        }
+      }
+
+      async auditCustom(event: string, payload: AuditCustomPayload = {}) {
+        await this.$writeAudit({
+          event,
+          oldValues: payload.old ?? null,
+          newValues: payload.new ?? null,
+          tags: payload.tags ?? null,
+          metadata: payload.metadata,
+        })
+      }
 
       audits() {
-        const audits = Audit.query()
-          .where('auditableType', this.constructor.name)
+        const ctor = this.constructor as typeof ModelWithAudit
+        return Audit.query()
+          .where('auditableType', ctor.resolveAuditableName())
           .where('auditableId', (this as any).id)
-        const promise = Promise.resolve(audits.clone())
-        Object.defineProperty(promise, 'first', {
-          value: async function () {
-            return audits.clone().first()
-          },
-        }).catch((e) => console.error(e))
-
-        Object.defineProperty(promise, 'last', {
-          value: async function () {
-            return audits.clone().orderBy('id', 'desc').first()
-          },
-        }).catch((e) => console.error(e))
-
-        return promise as AuditsCursor
-      }
-
-      transitionTo(audit: Audit, valuesType: 'old' | 'new') {
-        if (audit.auditableType !== this.constructor.name) {
-          throw new E_AUDITABLE_WRONG_TYPE([this.constructor.name, audit.auditableType])
-        }
-
-        if (audit.auditableId !== (this as any).id) {
-          throw new E_AUDITABLE_WRONG_INSTANCE([(this as any).id, '' + audit.auditableId])
-        }
-
-        const values = valuesType === 'old' ? audit.oldValues : audit.newValues
-        if (values === null) {
-          throw new E_AUDITABLE_LOAD_NULL([valuesType])
-        }
-
-        // Key incompatibilities
-        const incompatibilities = Object.keys(values).filter(
-          (element) => !Object.keys(this.$attributes).includes(element)
-        )
-        if (incompatibilities.length > 0) {
-          throw new E_AUDITABLE_INCOMPATIBLE_ATTRIBUTES([
-            incompatibilities[0],
-            audit.auditableType,
-            incompatibilities[0],
-          ])
-        }
-
-        for (const key in values) {
-          this.$attributes[key] = values[key]
-        }
-      }
-
-      async revert() {
-        const lastAudit = await this.audits().last()
-        if (lastAudit === null) {
-          throw new E_AUDITABLE_CANNOT_REVERT()
-        }
-        this.transitionTo(lastAudit, 'old')
       }
 
       $auditValuesToSave: ModelObject = {}
+      $auditDirtyKeys: string[] = []
 
       $backupAuditValues() {
-        this.$auditValuesToSave = this.$original
+        this.$auditValuesToSave = { ...this.$original }
+        this.$auditDirtyKeys = Object.keys(this.$dirty)
       }
 
-      async $audit(event: EventType, modelInstance: ModelWithAudit) {
-        await ModelWithAudit.#init()
-        const auditedUser = await ModelWithAudit.innerAuditing.getUserForContext()
-        const metadata = await ModelWithAudit.innerAuditing.getMetadataForContext()
+      static #emitter?: EmitterService
+      static #auditing?: AuditingService
+
+      static async #lazyServices() {
+        if (!ModelWithAudit.#emitter) {
+          const mod = await import('@adonisjs/core/services/emitter')
+          ModelWithAudit.#emitter = mod.default
+        }
+        if (!ModelWithAudit.#auditing) {
+          const mod = await import('../../services/auditing.js')
+          ModelWithAudit.#auditing = mod.default
+        }
+      }
+
+      async $writeAudit(opts: {
+        event: string
+        oldValues: Record<string, unknown> | null
+        newValues: Record<string, unknown> | null
+        tags?: string[] | null
+        metadata?: Record<string, unknown>
+      }) {
+        await ModelWithAudit.#lazyServices()
+        if (this.$isAuditDisabled || ModelWithAudit.#auditing!.isDisabled()) return
+
+        const user = await ModelWithAudit.#auditing!.getUserForContext()
+        const ctxMeta = await ModelWithAudit.#auditing!.getMetadataForContext()
 
         const audit = new Audit()
-        audit.userType = auditedUser?.type ?? null
-        audit.userId = auditedUser?.id ?? null
-        audit.event = event
-        audit.auditableType = modelInstance.constructor.name
-        audit.auditableId = (modelInstance as any).id
-        audit.oldValues = event === 'create' ? null : this.$auditValuesToSave
-        audit.newValues = event === 'delete' ? null : this.$attributes
-        audit.metadata = metadata
-        await audit.save()
+        audit.userType = user?.type ?? null
+        audit.userId = user?.id ?? null
+        audit.event = opts.event
+        audit.auditableType = (this.constructor as typeof ModelWithAudit).resolveAuditableName()
+        audit.auditableId = (this as any).id
+        audit.oldValues = opts.oldValues
+        audit.newValues = opts.newValues
+        audit.tags = opts.tags ?? null
+        audit.metadata = { ...ctxMeta, ...(opts.metadata ?? {}) }
 
-        await ModelWithAudit.innerEmitter.emit(`audit:${event}`, audit.id)
-      }
-
-      static async #init() {
-        if (ModelWithAudit.innerEmitter && ModelWithAudit.innerAuditing) {
-          return
+        if (this.$trx) {
+          audit.useTransaction(this.$trx)
         }
-        ModelWithAudit.innerEmitter = await import('@adonisjs/core/services/emitter').then(
-          (m) => m.default
-        )
-        ModelWithAudit.innerAuditing = await import('../../services/auditing.js').then(
-          (m) => m.default
-        )
+
+        await audit.save()
+        await ModelWithAudit.#emitter!.emit('audit:created', { audit })
       }
 
       @beforeCreate()
-      static async beforeSaveHook(modelInstance: ModelWithAudit) {
-        modelInstance.$backupAuditValues()
+      static async __auditBeforeCreate(model: ModelWithAudit) {
+        model.$backupAuditValues()
       }
 
       @afterCreate()
-      static afterSaveHook(modelInstance: ModelWithAudit) {
-        return modelInstance.$audit('create', modelInstance)
+      static async __auditAfterCreate(model: ModelWithAudit) {
+        const ctor = model.constructor as typeof ModelWithAudit
+        const filtered = ctor.filterAuditAttributes(model.$attributes)
+        await model.$writeAudit({
+          event: 'created',
+          oldValues: null,
+          newValues: filtered,
+          tags: ['mutation'],
+        })
       }
 
       @beforeUpdate()
-      static async beforeUpdateHook(modelInstance: ModelWithAudit) {
-        modelInstance.$backupAuditValues()
+      static async __auditBeforeUpdate(model: ModelWithAudit) {
+        model.$backupAuditValues()
       }
 
       @afterUpdate()
-      static afterUpdateHook(modelInstance: ModelWithAudit) {
-        return modelInstance.$audit('update', modelInstance)
+      static async __auditAfterUpdate(model: ModelWithAudit) {
+        const ctor = model.constructor as typeof ModelWithAudit
+        const dirtyKeys = model.$auditDirtyKeys
+        if (dirtyKeys.length === 0) return
+
+        const oldRaw: Record<string, unknown> = {}
+        const newRaw: Record<string, unknown> = {}
+        for (const key of dirtyKeys) {
+          oldRaw[key] = model.$auditValuesToSave[key]
+          newRaw[key] = model.$attributes[key]
+        }
+
+        const oldFiltered = ctor.filterAuditAttributes(oldRaw)
+        const newFiltered = ctor.filterAuditAttributes(newRaw)
+        if (Object.keys(newFiltered).length === 0) return
+
+        await model.$writeAudit({
+          event: 'updated',
+          oldValues: oldFiltered,
+          newValues: newFiltered,
+          tags: ['mutation'],
+        })
       }
 
       @beforeDelete()
-      static async beforeDeleteHook(modelInstance: ModelWithAudit) {
-        modelInstance.$backupAuditValues()
+      static async __auditBeforeDelete(model: ModelWithAudit) {
+        model.$backupAuditValues()
       }
 
       @afterDelete()
-      static afterDeleteHook(modelInstance: ModelWithAudit) {
-        return modelInstance.$audit('delete', modelInstance)
+      static async __auditAfterDelete(model: ModelWithAudit) {
+        const ctor = model.constructor as typeof ModelWithAudit
+        const filtered = ctor.filterAuditAttributes(model.$auditValuesToSave)
+        await model.$writeAudit({
+          event: 'deleted',
+          oldValues: filtered,
+          newValues: null,
+          tags: ['mutation'],
+        })
       }
     }
-
     return ModelWithAudit
   }
 }
