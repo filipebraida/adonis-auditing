@@ -92,25 +92,6 @@
     "access": "public",
     "provenance": true
   },
-  "tsdown": {
-    "entry": [
-      "./index.ts",
-      "./configure.ts",
-      "./services/auditing.ts",
-      "./providers/auditing_provider.ts",
-      "./src/types.ts",
-      "./src/errors.ts"
-    ],
-    "outDir": "./build",
-    "clean": true,
-    "format": "esm",
-    "minify": "dce-only",
-    "fixedExtension": false,
-    "dts": false,
-    "treeshake": false,
-    "sourcemaps": false,
-    "target": "esnext"
-  },
   "release-it": {
     "git": {
       "requireCleanWorkingDir": true,

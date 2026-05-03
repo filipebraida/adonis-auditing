@@ -3,5 +3,6 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "./build"
-  }
+  },
+  "exclude": ["tsdown.config.ts", "build", "node_modules"]
 }
