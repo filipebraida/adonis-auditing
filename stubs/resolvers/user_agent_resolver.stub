@@ -2,7 +2,7 @@
   exports({ to: path + '/user_agent_resolver.ts' })
 }}}
 import { type HttpContext } from '@adonisjs/core/http'
-import type { Resolver } from 'adonis-auditing/types'
+import type { Resolver } from '@filipebraida/adonis-auditing/types'
 
 export default class UserAgentResolver implements Resolver {
   async resolve(ctx: HttpContext) {

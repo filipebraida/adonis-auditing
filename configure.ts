@@ -10,7 +10,7 @@ export async function configure(command: ConfigureCommand) {
   await codemods.makeUsingStub(stubsRoot, 'config.stub', {})
 
   await codemods.updateRcFile((transformer) => {
-    transformer.addProvider('adonis-auditing/auditing_provider')
+    transformer.addProvider('@filipebraida/adonis-auditing/auditing_provider')
     transformer.setDirectory('audit_resolvers', 'app/audit_resolvers')
   })
 

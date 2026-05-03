@@ -1,7 +1,7 @@
 {{{
   exports({ to: app.configPath('auditing.ts') })
 }}}
-import { defineConfig } from 'adonis-auditing'
+import { defineConfig } from '@filipebraida/adonis-auditing'
 
 export default defineConfig({
   userResolver: () => import('#audit_resolvers/user_resolver'),

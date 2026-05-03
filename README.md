@@ -9,7 +9,7 @@ A maintained MIT continuation of [`@stouder-io/adonis-auditing`](https://github.
 ## Install
 
 ```bash
-node ace add adonis-auditing
+node ace add @filipebraida/adonis-auditing
 ```
 
 This registers the provider, scaffolds `config/auditing.ts`, the `audits` migration, and four default resolvers (`user`, `ip_address`, `user_agent`, `url`) under `app/audit_resolvers/`.
@@ -25,7 +25,7 @@ node ace migration:run
 ```ts
 import { compose } from '@adonisjs/core/helpers'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
-import { Auditable } from 'adonis-auditing'
+import { Auditable } from '@filipebraida/adonis-auditing'
 
 export default class Post extends compose(BaseModel, Auditable) {
   // Optional: override the value stored in audits.auditable_type
@@ -56,7 +56,7 @@ Create / update / delete are now recorded in the `audits` table. Updates store o
 The same selectivity options exist at the config level. Globals are unioned with per-model declarations:
 
 ```ts
-import { defineConfig } from 'adonis-auditing'
+import { defineConfig } from '@filipebraida/adonis-auditing'
 
 export default defineConfig({
   userResolver: () => import('#audit_resolvers/user_resolver'),
@@ -136,7 +136,7 @@ await post.withoutAudit(async () => {
 })
 
 // Globally (e.g., seeders, bulk migrations):
-import auditing from 'adonis-auditing/services/main'
+import auditing from '@filipebraida/adonis-auditing/services/main'
 await auditing.disabled(async () => {
   await User.createMany(megaSeed)
 })
@@ -189,7 +189,7 @@ Indexes: `(auditable_type, auditable_id)`, `(user_type, user_id)`, `(event)`, `(
 Edit `config/auditing.ts` to plug in custom resolvers:
 
 ```ts
-import { defineConfig } from 'adonis-auditing'
+import { defineConfig } from '@filipebraida/adonis-auditing'
 
 export default defineConfig({
   userResolver: () => import('#audit_resolvers/user_resolver'),
@@ -206,7 +206,7 @@ Each resolver implements:
 
 ```ts
 import { HttpContext } from '@adonisjs/core/http'
-import type { Resolver } from 'adonis-auditing/types'
+import type { Resolver } from '@filipebraida/adonis-auditing/types'
 
 export default class TenantIdResolver implements Resolver {
   async resolve(ctx: HttpContext) {
@@ -219,7 +219,7 @@ The user resolver is special — it returns `{ id: string, type: string } | null
 
 ```ts
 import { HttpContext } from '@adonisjs/core/http'
-import type { UserResolver } from 'adonis-auditing/types'
+import type { UserResolver } from '@filipebraida/adonis-auditing/types'
 
 export default class MyUserResolver implements UserResolver {
   async resolve(ctx: HttpContext) {
