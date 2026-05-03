@@ -14,16 +14,16 @@ export default defineConfig({
   /**
    * Field names whose values are replaced with '******' in audit rows.
    * Use this for sensitive data (passwords, tokens) where you still want
-   * the *event* of change recorded but not the value itself. Per-model
-   * masking is also available via `static auditMask = [...]` on the model.
+   * the event of change recorded but not the value itself. Per-model
+   * masking is also available via the static auditMask slot on the model.
    */
   hiddenFields: [],
 
   /**
    * Field names to drop from audit rows project-wide. Use this for
-   * noise columns like `updatedAt`/`createdAt`. Per-model overrides
-   * via `static auditExclude = [...]` are unioned with this list.
-   * Does not apply to auditCustom payloads.
+   * noise columns such as updatedAt or createdAt. Per-model overrides
+   * via the static auditExclude slot on the model are unioned with this
+   * list. Does not apply to auditCustom payloads.
    */
   auditExclude: [],
 })
