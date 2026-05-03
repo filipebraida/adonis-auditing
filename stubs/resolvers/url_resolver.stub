@@ -1,7 +1,7 @@
 {{{
   exports({ to: path + '/url_resolver.ts' })
 }}}
-import { HttpContext } from '@adonisjs/core/http'
+import { type HttpContext } from '@adonisjs/core/http'
 import type { Resolver } from 'adonis-auditing/types'
 
 export default class UrlResolver implements Resolver {
@@ -9,3 +9,4 @@ export default class UrlResolver implements Resolver {
     return ctx.request.url(true)
   }
 }
+

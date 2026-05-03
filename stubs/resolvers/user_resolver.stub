@@ -1,7 +1,7 @@
 {{{
   exports({ to: path + '/user_resolver.ts' })
 }}}
-import { HttpContext } from '@adonisjs/core/http'
+import { type HttpContext } from '@adonisjs/core/http'
 import type { UserResolver } from 'adonis-auditing/types'
 
 export default class UserResolverImpl implements UserResolver {
@@ -11,3 +11,4 @@ export default class UserResolverImpl implements UserResolver {
     return { type: user.constructor.name, id: String(user.id) }
   }
 }
+
