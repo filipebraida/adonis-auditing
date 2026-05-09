@@ -8,11 +8,16 @@ export interface Resolver {
   resolve(ctx: HttpContext): Promise<unknown>
 }
 
+export interface TenantResolver {
+  resolve(ctx: HttpContext): Promise<string | null> | string | null
+}
+
 export interface AuditingConfig {
   userResolver: () => Promise<{ default: new () => UserResolver }>
   resolvers: Record<string, () => Promise<{ default: new () => Resolver }>>
   hiddenFields?: string[]
   auditExclude?: string[]
+  tenantResolver?: () => Promise<{ default: new () => TenantResolver }>
 }
 
 export interface ResolvedAuditingConfig {
@@ -20,11 +25,13 @@ export interface ResolvedAuditingConfig {
   resolvers: Record<string, Resolver>
   hiddenFields: string[]
   auditExclude: string[]
+  tenantResolver: TenantResolver | null
 }
 
 export interface AuditingService {
   getUserForContext(): Promise<{ id: string; type: string } | null>
   getMetadataForContext(): Promise<Record<string, unknown>>
+  getTenantForContext(): Promise<string | null>
   getHiddenFields(): string[]
   getAuditExclude(): string[]
   isDisabled(): boolean

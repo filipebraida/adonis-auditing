@@ -11,11 +11,13 @@ export function defineConfig(config: AuditingConfig): ConfigProvider<ResolvedAud
         return [key, new resolver.default()] as const
       })
     )
+    const tenantResolverModule = config.tenantResolver ? await config.tenantResolver() : null
     return {
       userResolver: new userResolver.default(),
       resolvers: Object.fromEntries(resolversMap),
       hiddenFields: config.hiddenFields ?? [],
       auditExclude: config.auditExclude ?? [],
+      tenantResolver: tenantResolverModule ? new tenantResolverModule.default() : null,
     }
   })
 }

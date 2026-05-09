@@ -122,6 +122,7 @@ export function withAuditable() {
 
         const user = await ModelWithAudit.#auditing!.getUserForContext()
         const ctxMeta = await ModelWithAudit.#auditing!.getMetadataForContext()
+        const tenantFromCtx = await ModelWithAudit.#auditing!.getTenantForContext()
 
         const ctor = this.constructor as typeof ModelWithAudit
         const masked = new Set<string>([
@@ -149,6 +150,12 @@ export function withAuditable() {
         const mergedTags = [...(opts.tags ?? []), ...extraTags]
         audit.tags = mergedTags.length > 0 ? mergedTags : null
         audit.metadata = maskValues({ ...ctxMeta, ...(opts.metadata ?? {}) })!
+        if (tenantFromCtx !== null && tenantFromCtx !== undefined) {
+          audit.tenantId = tenantFromCtx
+        } else {
+          const fromModel = (this as any).tenantId
+          audit.tenantId = fromModel !== null && fromModel !== undefined ? String(fromModel) : null
+        }
 
         if (this.$trx) {
           audit.useTransaction(this.$trx)

@@ -54,6 +54,20 @@ export default class AuditingManager implements AuditingService {
     )
   }
 
+  async getTenantForContext(): Promise<string | null> {
+    if (!this.config.tenantResolver) return null
+    const ctx = HttpContext.get()
+    try {
+      return await this.config.tenantResolver.resolve(ctx as HttpContext)
+    } catch (error) {
+      this.logger.warn(
+        { err: error },
+        'adonis-auditing: tenantResolver threw. Falling back to model.tenantId if present.'
+      )
+      return null
+    }
+  }
+
   getHiddenFields(): string[] {
     return this.config.hiddenFields
   }

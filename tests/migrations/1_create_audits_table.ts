@@ -15,6 +15,7 @@ export default class extends BaseSchema {
       table.json('new_values').nullable()
       table.json('tags').nullable()
       table.json('metadata').nullable()
+      table.text('tenant_id').nullable()
       table.timestamp('created_at').notNullable()
       table.timestamp('updated_at').notNullable()
 
@@ -22,6 +23,7 @@ export default class extends BaseSchema {
       table.index(['user_type', 'user_id'], 'idx_audits_user')
       table.index('event', 'idx_audits_event')
       table.index('created_at', 'idx_audits_created_at')
+      table.index('tenant_id', 'idx_audits_tenant')
     })
   }
 

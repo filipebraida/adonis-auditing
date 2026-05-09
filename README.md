@@ -60,7 +60,9 @@ import { defineConfig } from '@filipebraida/adonis-auditing'
 
 export default defineConfig({
   userResolver: () => import('#audit_resolvers/user_resolver'),
-  resolvers: { /* ... */ },
+  resolvers: {
+    /* ... */
+  },
 
   // Drop these from every audit (project-wide). Useful for noise
   // columns like `updatedAt`/`createdAt`. Does not apply to
@@ -113,7 +115,7 @@ class OrderItem extends compose(BaseModel, Auditable) {
 These tags are appended to whatever the call site provides:
 
 ```ts
-await item.save()                                     // tags: ['mutation', 'order:42']
+await item.save() // tags: ['mutation', 'order:42']
 await item.auditCustom('shipped', { tags: ['ship'] }) // tags: ['ship', 'order:42']
 ```
 
@@ -157,14 +159,14 @@ Each `Audit` row exposes diff helpers:
 ```ts
 const audit = await post.audits().orderBy('id', 'desc').firstOrFail()
 
-audit.changes()            // { title: { old: 'Foo', new: 'Bar' }, ... }
-audit.changesFor('title')  // { old: 'Foo', new: 'Bar' }
-audit.changedFields()      // ['title']
-audit.changesDisplay()     // 'title: "Foo" → "Bar"'
+audit.changes() // { title: { old: 'Foo', new: 'Bar' }, ... }
+audit.changesFor('title') // { old: 'Foo', new: 'Bar' }
+audit.changedFields() // ['title']
+audit.changesDisplay() // 'title: "Foo" → "Bar"'
 audit.changesDisplay({ labels: { title: 'Title' }, separator: ' to ' })
 
-audit.maskedFields()       // ['password'] when newValues has '******'
-audit.hasMaskedFields()    // true if any field was masked at write time
+audit.maskedFields() // ['password'] when newValues has '******'
+audit.hasMaskedFields() // true if any field was masked at write time
 ```
 
 ## Reacting to audits
@@ -183,21 +185,22 @@ emitter.on('audit:created', ({ audit }) => {
 
 The `audits` table:
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigserial | PK |
-| `user_type` | text, nullable | Polymorphic actor type (model name, `'system'`, etc.) |
-| `user_id` | text, nullable | Polymorphic actor id (string supports UUIDs and `'system'`) |
-| `event` | text | Free-form (`'created'`, `'updated'`, `'deleted'`, `'published'`, `'viewed'`, ...) |
-| `auditable_type` | text | From `static auditableName`, defaults to class name |
-| `auditable_id` | bigint | The audited entity's id |
-| `old_values` | jsonb, nullable | Diff (update) or full snapshot (delete) or null (create) |
-| `new_values` | jsonb, nullable | Diff (update) or full snapshot (create) or null (delete) |
-| `tags` | jsonb, nullable | Array of strings — `['mutation']` for CRUD, plus per-call `auditCustom` tags and any `auditTags()` overrides |
-| `metadata` | jsonb, nullable | Bag from resolvers (ip, user-agent, url, ...) plus per-call extras |
-| `created_at`, `updated_at` | timestamptz | |
+| Column                     | Type            | Notes                                                                                                        |
+| -------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------ |
+| `id`                       | bigserial       | PK                                                                                                           |
+| `user_type`                | text, nullable  | Polymorphic actor type (model name, `'system'`, etc.)                                                        |
+| `user_id`                  | text, nullable  | Polymorphic actor id (string supports UUIDs and `'system'`)                                                  |
+| `event`                    | text            | Free-form (`'created'`, `'updated'`, `'deleted'`, `'published'`, `'viewed'`, ...)                            |
+| `auditable_type`           | text            | From `static auditableName`, defaults to class name                                                          |
+| `auditable_id`             | bigint          | The audited entity's id                                                                                      |
+| `old_values`               | jsonb, nullable | Diff (update) or full snapshot (delete) or null (create)                                                     |
+| `new_values`               | jsonb, nullable | Diff (update) or full snapshot (create) or null (delete)                                                     |
+| `tags`                     | jsonb, nullable | Array of strings — `['mutation']` for CRUD, plus per-call `auditCustom` tags and any `auditTags()` overrides |
+| `metadata`                 | jsonb, nullable | Bag from resolvers (ip, user-agent, url, ...) plus per-call extras                                           |
+| `tenant_id`                | text, nullable  | SaaS tenant scope. Populated from `tenantResolver` config (HTTP context) or `model.tenantId` fallback        |
+| `created_at`, `updated_at` | timestamptz     |                                                                                                              |
 
-Indexes: `(auditable_type, auditable_id)`, `(user_type, user_id)`, `(event)`, `(created_at DESC)`.
+Indexes: `(auditable_type, auditable_id)`, `(user_type, user_id)`, `(event)`, `(created_at DESC)`, `(tenant_id)`.
 
 ## Configuration
 
@@ -208,29 +211,29 @@ import { defineConfig } from '@filipebraida/adonis-auditing'
 
 export default defineConfig({
   userResolver: () => import('#audit_resolvers/user_resolver'),
+  tenantResolver: () => import('#audit_resolvers/tenant_resolver'),
   resolvers: {
     ip_address: () => import('#audit_resolvers/ip_address_resolver'),
     user_agent: () => import('#audit_resolvers/user_agent_resolver'),
     url: () => import('#audit_resolvers/url_resolver'),
-    // tenant_id: () => import('#audit_resolvers/tenant_id_resolver'),
   },
 })
 ```
 
-Each resolver implements:
+Each metadata resolver in `resolvers: {...}` implements:
 
 ```ts
 import { HttpContext } from '@adonisjs/core/http'
 import type { Resolver } from '@filipebraida/adonis-auditing/types'
 
-export default class TenantIdResolver implements Resolver {
+export default class IpAddressResolver implements Resolver {
   async resolve(ctx: HttpContext) {
-    return ctx.request.header('x-tenant-id')
+    return ctx.request.ip()
   }
 }
 ```
 
-The user resolver is special — it returns `{ id: string, type: string } | null`:
+The user resolver returns `{ id: string, type: string } | null`:
 
 ```ts
 import { HttpContext } from '@adonisjs/core/http'
@@ -244,6 +247,21 @@ export default class MyUserResolver implements UserResolver {
   }
 }
 ```
+
+The tenant resolver returns `string | null`:
+
+```ts
+import { HttpContext } from '@adonisjs/core/http'
+import type { TenantResolver } from '@filipebraida/adonis-auditing/types'
+
+export default class MyTenantResolver implements TenantResolver {
+  async resolve(ctx: HttpContext) {
+    return ctx.auth.user?.organizationId ?? null
+  }
+}
+```
+
+When `tenantResolver` returns null (background jobs without HttpContext, or explicit null), the audit's `tenant_id` falls back to the audited model's `tenantId` column if it has one. Models without a `tenantId` column produce audits with `tenant_id = null`.
 
 ## Troubleshooting
 
