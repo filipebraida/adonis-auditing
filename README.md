@@ -152,6 +152,21 @@ const recentViews = await post.audits().where('event', 'viewed').limit(20)
 
 `post.audits()` returns a Lucid `ModelQueryBuilder<Audit>` — the full Lucid query API is available.
 
+Each `Audit` row exposes diff helpers:
+
+```ts
+const audit = await post.audits().orderBy('id', 'desc').firstOrFail()
+
+audit.changes()            // { title: { old: 'Foo', new: 'Bar' }, ... }
+audit.changesFor('title')  // { old: 'Foo', new: 'Bar' }
+audit.changedFields()      // ['title']
+audit.changesDisplay()     // 'title: "Foo" → "Bar"'
+audit.changesDisplay({ labels: { title: 'Title' }, separator: ' to ' })
+
+audit.maskedFields()       // ['password'] when newValues has '******'
+audit.hasMaskedFields()    // true if any field was masked at write time
+```
+
 ## Reacting to audits
 
 ```ts

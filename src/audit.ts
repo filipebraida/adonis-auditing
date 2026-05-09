@@ -44,4 +44,47 @@ export default class Audit extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
+
+  changes(): Record<string, { old: any; new: any }> {
+    const old = this.oldValues ?? {}
+    const next = this.newValues ?? {}
+    const fields = new Set([...Object.keys(old), ...Object.keys(next)])
+    const result: Record<string, { old: any; new: any }> = {}
+    for (const f of fields) {
+      result[f] = { old: old[f], new: next[f] }
+    }
+    return result
+  }
+
+  changesFor(field: string): { old: any; new: any } | undefined {
+    return this.changes()[field]
+  }
+
+  changedFields(): string[] {
+    return Object.keys(this.changes())
+  }
+
+  changesDisplay(opts?: { labels?: Record<string, string>; separator?: string }): string {
+    const sep = opts?.separator ?? ' → '
+    const labels = opts?.labels ?? {}
+    return Object.entries(this.changes())
+      .map(([f, { old, new: n }]) => {
+        const label = labels[f] ?? f
+        const oldStr = old === undefined ? 'undefined' : JSON.stringify(old)
+        const newStr = n === undefined ? 'undefined' : JSON.stringify(n)
+        return `${label}: ${oldStr}${sep}${newStr}`
+      })
+      .join('\n')
+  }
+
+  maskedFields(): string[] {
+    const next = this.newValues ?? {}
+    return Object.entries(next)
+      .filter(([, v]) => v === '******')
+      .map(([k]) => k)
+  }
+
+  hasMaskedFields(): boolean {
+    return this.maskedFields().length > 0
+  }
 }
