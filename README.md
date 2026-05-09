@@ -37,9 +37,17 @@ export default class Post extends compose(BaseModel, Auditable) {
   // Or whitelist (wins over auditExclude when both set):
   // static auditInclude = ['title', 'status']
 
-  // Mask values with '******' instead of dropping — preserves the
-  // event of change but hides the value:
+  // Mask values instead of dropping — preserves the event of change
+  // but hides the value. Pass a string[] for full mask, or a Record
+  // for per-field strategies:
   static auditMask = ['password']
+  // Or with strategies:
+  // static auditMask = {
+  //   password: true,                                          // → '******'
+  //   creditCard: { strategy: 'keep-last', n: 4 },             // → '****8765'
+  //   apiKey: { strategy: 'keep-first', n: 3 },                // → 'sk-*****'
+  //   phone: { redact: (v) => String(v).slice(0, 3) + '****' },// custom
+  // }
 
   @column({ isPrimary: true }) declare id: number
   @column() declare title: string
@@ -74,6 +82,8 @@ export default defineConfig({
   hiddenFields: ['password', 'apiKey'],
 })
 ```
+
+`hiddenFields` accepts the same `MaskConfig` shape as `auditMask` (`string[]` or `Record<string, true | MaskStrategy>`).
 
 Precedence when a field appears in multiple lists:
 
@@ -144,6 +154,24 @@ await auditing.disabled(async () => {
 })
 ```
 
+Declarative skip via a per-model predicate. Receives `(model, event)` where event is `'created' | 'updated' | 'deleted'`. Return `false` to skip the audit row:
+
+```ts
+class Post extends compose(BaseModel, Auditable) {
+  static auditIf = (model: Post, event: string) =>
+    !(event === 'updated' && Object.keys(model.$dirty).every((k) => k === 'lastSeenAt'))
+}
+```
+
+Global noise filter — for `'updated'` events only, skip when the dirty fields are a subset of this list:
+
+```ts
+defineConfig({
+  // ... other config
+  skipIfOnlyChanged: ['updatedAt', 'lastSeenAt'],
+})
+```
+
 ## Reading the history
 
 ```ts
@@ -201,6 +229,24 @@ The `audits` table:
 | `created_at`, `updated_at` | timestamptz     |                                                                                                              |
 
 Indexes: `(auditable_type, auditable_id)`, `(user_type, user_id)`, `(event)`, `(created_at DESC)`, `(tenant_id)`.
+
+## Pruning old audits
+
+Audit tables grow unbounded. The `audit:prune` ace command deletes old rows by age, by per-entity count, or both. Schedule it for production retention (cron, AdonisJS scheduler, etc.). At least one of `--days` or `--keep` is required; combining them is allowed.
+
+```bash
+# Delete audits older than 90 days
+node ace audit:prune --days=90
+
+# Per (auditable_type, auditable_id), keep only the 10 most recent
+node ace audit:prune --keep=10
+
+# Scope to a single model
+node ace audit:prune --days=90 --model=Post
+
+# Preview what would be deleted without touching the table
+node ace audit:prune --days=90 --dry-run
+```
 
 ## Configuration
 
