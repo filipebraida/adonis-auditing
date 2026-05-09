@@ -1,4 +1,4 @@
-import type { AuditingService, ResolvedAuditingConfig } from './types.js'
+import type { AuditingService, MaskConfig, ResolvedAuditingConfig } from './types.js'
 import { HttpContext } from '@adonisjs/core/http'
 import type { LoggerService } from '@adonisjs/core/types'
 import { isDisabled, runDisabled } from './disable_scope.js'
@@ -68,7 +68,7 @@ export default class AuditingManager implements AuditingService {
     }
   }
 
-  getHiddenFields(): string[] {
+  getHiddenFields(): MaskConfig {
     return this.config.hiddenFields
   }
 

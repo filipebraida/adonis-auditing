@@ -9,9 +9,70 @@ import {
 } from '@adonisjs/lucid/orm'
 import type { ModelObject } from '@adonisjs/lucid/types/model'
 import type { EmitterService } from '@adonisjs/core/types'
-import type { AuditCustomPayload, AuditingService } from '../types.js'
+import type { AuditCustomPayload, AuditingService, MaskConfig, MaskStrategy } from '../types.js'
 import type { NormalizeConstructor } from '../utils/normalized_constructor.js'
 import Audit from '../audit.js'
+
+const FULL_MASK = '******'
+
+/**
+ * Look up the masking strategy for a single field. Per-model mask wins over
+ * global hiddenFields (more specific). Returns `null` when the field is not
+ * masked anywhere.
+ */
+function resolveMaskStrategy(
+  field: string,
+  perModel: MaskConfig,
+  global: MaskConfig
+): MaskStrategy | true | null {
+  // Per-model first (more specific).
+  if (Array.isArray(perModel)) {
+    if (perModel.includes(field)) return true
+  } else if (Object.prototype.hasOwnProperty.call(perModel, field)) {
+    return perModel[field]
+  }
+  // Then global.
+  if (Array.isArray(global)) {
+    if (global.includes(field)) return true
+  } else if (Object.prototype.hasOwnProperty.call(global, field)) {
+    return global[field]
+  }
+  return null
+}
+
+/**
+ * Apply a resolved strategy to a single value. `true` and `string[]` entries
+ * collapse to the literal full mask; structured strategies operate on the
+ * value's string form. Null / undefined pass through untouched so we don't
+ * fabricate data.
+ */
+function applyMask(value: unknown, strategy: MaskStrategy | true): string | null | undefined {
+  if (value === null || value === undefined) return value as null | undefined
+  if (strategy === true) return FULL_MASK
+
+  if ('redact' in strategy) {
+    return strategy.redact(value)
+  }
+
+  const str = String(value)
+  const char = strategy.char ?? '*'
+  const n = strategy.n
+
+  if (strategy.strategy === 'keep-last') {
+    if (str.length <= n) {
+      // Value is too short to safely reveal `n` chars — degrade to full mask
+      // so we never leak the original string.
+      return str.length === 0 ? FULL_MASK : char.repeat(str.length)
+    }
+    return char.repeat(str.length - n) + str.slice(-n)
+  }
+
+  // keep-first
+  if (str.length <= n) {
+    return str.length === 0 ? FULL_MASK : char.repeat(str.length)
+  }
+  return str.slice(0, n) + char.repeat(str.length - n)
+}
 
 export function withAuditable() {
   return <T extends NormalizeConstructor<typeof BaseModel>>(superclass: T) => {
@@ -19,7 +80,7 @@ export function withAuditable() {
       static auditableName?: string
       static auditExclude: string[] = []
       static auditInclude: string[] = []
-      static auditMask: string[] = []
+      static auditMask: MaskConfig = []
       static auditIf?: (model: any, event: string) => boolean | Promise<boolean>
 
       static resolveAuditableName(): string {
@@ -126,15 +187,18 @@ export function withAuditable() {
         const tenantFromCtx = await ModelWithAudit.#auditing!.getTenantForContext()
 
         const ctor = this.constructor as typeof ModelWithAudit
-        const masked = new Set<string>([
-          ...ModelWithAudit.#auditing!.getHiddenFields(),
-          ...ctor.auditMask,
-        ])
+        const globalMask = ModelWithAudit.#auditing!.getHiddenFields()
+        const perModelMask = ctor.auditMask
+        const hasAnyMask =
+          (Array.isArray(globalMask) ? globalMask.length : Object.keys(globalMask).length) > 0 ||
+          (Array.isArray(perModelMask) ? perModelMask.length : Object.keys(perModelMask).length) > 0
+
         const maskValues = (obj: Record<string, unknown> | null) => {
-          if (!obj || masked.size === 0) return obj
+          if (!obj || !hasAnyMask) return obj
           const out: Record<string, unknown> = {}
           for (const k of Object.keys(obj)) {
-            out[k] = masked.has(k) ? '******' : obj[k]
+            const strategy = resolveMaskStrategy(k, perModelMask, globalMask)
+            out[k] = strategy === null ? obj[k] : applyMask(obj[k], strategy)
           }
           return out
         }
