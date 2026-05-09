@@ -174,7 +174,7 @@ test.group('Multitenancy — resolver error paths', (group) => {
     ;({ app } = await setupApp({
       tenantResolver: async () => ({
         default: class {
-          async resolve() {
+          async resolve(): Promise<string | null> {
             throw new Error('boom')
           }
         },
