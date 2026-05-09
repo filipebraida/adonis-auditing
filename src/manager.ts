@@ -75,4 +75,8 @@ export default class AuditingManager implements AuditingService {
   getAuditExclude(): string[] {
     return this.config.auditExclude
   }
+
+  getSkipIfOnlyChanged(): string[] {
+    return this.config.skipIfOnlyChanged
+  }
 }

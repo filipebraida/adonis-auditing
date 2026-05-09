@@ -18,6 +18,7 @@ export function defineConfig(config: AuditingConfig): ConfigProvider<ResolvedAud
       hiddenFields: config.hiddenFields ?? [],
       auditExclude: config.auditExclude ?? [],
       tenantResolver: tenantResolverModule ? new tenantResolverModule.default() : null,
+      skipIfOnlyChanged: config.skipIfOnlyChanged ?? [],
     }
   })
 }

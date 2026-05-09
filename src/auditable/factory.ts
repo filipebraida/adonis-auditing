@@ -20,6 +20,7 @@ export function withAuditable() {
       static auditExclude: string[] = []
       static auditInclude: string[] = []
       static auditMask: string[] = []
+      static auditIf?: (model: any, event: string) => boolean | Promise<boolean>
 
       static resolveAuditableName(): string {
         return this.auditableName ?? this.name
@@ -176,6 +177,7 @@ export function withAuditable() {
         const filtered = ctor.filterAuditAttributes(model.$attributes)
         const final = await model.$applyGlobalExclude(filtered)
         if (Object.keys(final).length === 0) return
+        if (ctor.auditIf && !(await ctor.auditIf(model, 'created'))) return
         await model.$writeAudit({
           event: 'created',
           oldValues: null,
@@ -195,6 +197,10 @@ export function withAuditable() {
         const dirtyKeys = model.$auditDirtyKeys
         if (dirtyKeys.length === 0) return
 
+        await ModelWithAudit.#lazyServices()
+        const skipList = ModelWithAudit.#auditing!.getSkipIfOnlyChanged()
+        if (skipList.length > 0 && dirtyKeys.every((k) => skipList.includes(k))) return
+
         const oldRaw: Record<string, unknown> = {}
         const newRaw: Record<string, unknown> = {}
         for (const key of dirtyKeys) {
@@ -207,6 +213,8 @@ export function withAuditable() {
         const oldFinal = await model.$applyGlobalExclude(oldFiltered)
         const newFinal = await model.$applyGlobalExclude(newFiltered)
         if (Object.keys(newFinal).length === 0) return
+
+        if (ctor.auditIf && !(await ctor.auditIf(model, 'updated'))) return
 
         await model.$writeAudit({
           event: 'updated',
@@ -227,6 +235,7 @@ export function withAuditable() {
         const filtered = ctor.filterAuditAttributes(model.$auditValuesToSave)
         const final = await model.$applyGlobalExclude(filtered)
         if (Object.keys(final).length === 0) return
+        if (ctor.auditIf && !(await ctor.auditIf(model, 'deleted'))) return
         await model.$writeAudit({
           event: 'deleted',
           oldValues: final,

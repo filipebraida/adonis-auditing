@@ -10,6 +10,7 @@ export async function setupApp(
     hiddenFields?: string[]
     auditExclude?: string[]
     tenantResolver?: () => Promise<{ default: new () => import('../src/types.js').TenantResolver }>
+    skipIfOnlyChanged?: string[]
   } = {}
 ) {
   const ignitor = new IgnitorFactory()
@@ -44,6 +45,7 @@ export async function setupApp(
           hiddenFields: opts.hiddenFields,
           auditExclude: opts.auditExclude,
           tenantResolver: opts.tenantResolver,
+          skipIfOnlyChanged: opts.skipIfOnlyChanged,
         }),
       },
     })

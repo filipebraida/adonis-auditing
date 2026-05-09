@@ -18,6 +18,7 @@ export interface AuditingConfig {
   hiddenFields?: string[]
   auditExclude?: string[]
   tenantResolver?: () => Promise<{ default: new () => TenantResolver }>
+  skipIfOnlyChanged?: string[]
 }
 
 export interface ResolvedAuditingConfig {
@@ -26,6 +27,7 @@ export interface ResolvedAuditingConfig {
   hiddenFields: string[]
   auditExclude: string[]
   tenantResolver: TenantResolver | null
+  skipIfOnlyChanged: string[]
 }
 
 export interface AuditingService {
@@ -34,6 +36,7 @@ export interface AuditingService {
   getTenantForContext(): Promise<string | null>
   getHiddenFields(): string[]
   getAuditExclude(): string[]
+  getSkipIfOnlyChanged(): string[]
   isDisabled(): boolean
   disabled<T>(callback: () => Promise<T>): Promise<T>
 }
