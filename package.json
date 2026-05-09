@@ -28,6 +28,14 @@
     "./types": {
       "types": "./build/src/types.d.ts",
       "import": "./build/src/types.js"
+    },
+    "./commands": {
+      "types": "./build/commands/main.d.ts",
+      "import": "./build/commands/main.js"
+    },
+    "./commands/*": {
+      "types": "./build/commands/*.d.ts",
+      "import": "./build/commands/*.js"
     }
   },
   "scripts": {

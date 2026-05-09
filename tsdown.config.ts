@@ -9,6 +9,8 @@ export default defineConfig({
     './src/types.ts',
     './src/errors.ts',
     './stubs/main.ts',
+    './commands/main.ts',
+    './commands/audit_prune.ts',
   ],
   outDir: './build',
   unbundle: true,

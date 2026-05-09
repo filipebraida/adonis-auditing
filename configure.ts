@@ -10,6 +10,7 @@ export async function configure(command: ConfigureCommand) {
 
   await codemods.updateRcFile((transformer) => {
     transformer.addProvider('@filipebraida/adonis-auditing/auditing_provider')
+    transformer.addCommand('@filipebraida/adonis-auditing/commands')
     transformer.setDirectory('audit_resolvers', 'app/audit_resolvers')
   })
 
