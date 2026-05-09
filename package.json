@@ -1,7 +1,7 @@
 {
   "name": "@filipebraida/adonis-auditing",
   "description": "Audit your Lucid models with ease (AdonisJS v7).",
-  "version": "2.0.0-alpha.3",
+  "version": "2.0.0-alpha.4",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -53,7 +53,16 @@
     "version": "npm run build",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["audit", "auditing", "lucid", "adonis", "adonisjs", "history", "log", "tracking"],
+  "keywords": [
+    "audit",
+    "auditing",
+    "lucid",
+    "adonis",
+    "adonisjs",
+    "history",
+    "log",
+    "tracking"
+  ],
   "author": "Filipe Braida <filipebraida@gmail.com>",
   "license": "MIT",
   "repository": {
