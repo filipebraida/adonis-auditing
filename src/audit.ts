@@ -3,7 +3,10 @@ import { BaseModel, column } from '@adonisjs/lucid/orm'
 import type { ModelObject } from '@adonisjs/lucid/types/model'
 
 const jsonColumn = {
-  consume: (value: string | null) => (value ? JSON.parse(value) : null),
+  consume: (value: unknown) => {
+    if (value === null || value === undefined) return null
+    return typeof value === 'string' ? JSON.parse(value) : value
+  },
   prepare: (value: unknown) => (value ? JSON.stringify(value) : null),
   serialize: (value: unknown) => (value ? value : null),
 }
