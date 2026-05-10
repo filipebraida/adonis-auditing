@@ -254,8 +254,8 @@ The `audits` table:
 | `tags`                     | jsonb, nullable | Array of strings — `['mutation']` for CRUD, plus per-call `auditCustom` tags and any `auditTags()` overrides |
 | `metadata`                 | jsonb, nullable | Bag from resolvers (ip, user-agent, url, ...) plus per-call extras                                           |
 | `tenant_id`                | text, nullable  | SaaS tenant scope. Populated from `tenantResolver` config (HTTP context) or `model.tenantId` fallback        |
-| `audit_comment`            | text, nullable  | Per-write justification (S4). Set `model.auditComment` before `.save()` or via `auditCustom`                 |
-| `request_id`               | text, nullable  | Auto-correlation per HTTP request (A2). Read from `ctx.request.id()` if present                              |
+| `audit_comment`            | text, nullable  | Per-write justification. Set `model.auditComment` before `.save()`                                           |
+| `request_id`               | text, nullable  | Auto-correlation per HTTP request. Read from `ctx.request.id()` if present                                   |
 | `created_at`, `updated_at` | timestamptz     |                                                                                                              |
 
 Indexes: `(auditable_type, auditable_id)`, `(user_type, user_id)`, `(event)`, `(created_at DESC)`, `(tenant_id)`, `(request_id)`.
@@ -287,7 +287,9 @@ import { defineConfig } from '@filipebraida/adonis-auditing'
 
 export default defineConfig({
   userResolver: () => import('#audit_resolvers/user_resolver'),
-  tenantResolver: () => import('#audit_resolvers/tenant_resolver'),
+  // Uncomment after creating app/audit_resolvers/tenant_resolver.ts
+  // (see "tenant resolver" example below). Optional — for SaaS multitenancy.
+  // tenantResolver: () => import('#audit_resolvers/tenant_resolver'),
   resolvers: {
     ip_address: () => import('#audit_resolvers/ip_address_resolver'),
     user_agent: () => import('#audit_resolvers/user_agent_resolver'),
