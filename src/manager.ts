@@ -57,8 +57,9 @@ export default class AuditingManager implements AuditingService {
   async getTenantForContext(): Promise<string | null> {
     if (!this.config.tenantResolver) return null
     const ctx = HttpContext.get()
+    if (!ctx) return null
     try {
-      return await this.config.tenantResolver.resolve(ctx as HttpContext)
+      return await this.config.tenantResolver.resolve(ctx)
     } catch (error) {
       this.logger.warn(
         { err: error },

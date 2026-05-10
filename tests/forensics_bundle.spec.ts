@@ -177,6 +177,147 @@ test.group('Forensics — auditCommentRequired enforcement', (group) => {
 
     assert.isNull(a.auditComment)
   })
+
+  test('auditCommentRequired does NOT throw inside withoutAudit', async ({ assert }) => {
+    class CompliantModel extends compose(BaseModel, Auditable) {
+      static auditCommentRequired = true
+      static table = 'posts'
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const m = new CompliantModel()
+    m.title = 'inside-without-audit'
+    await m.withoutAudit(async () => {
+      await m.save() // must NOT throw
+    })
+
+    const audits = await Audit.query().where('auditableType', 'CompliantModel')
+    assert.lengthOf(audits, 0, 'no audit should be written')
+  })
+
+  test('auditCommentRequired does NOT throw when auditIf returns false', async ({ assert }) => {
+    class GatedModel extends compose(BaseModel, Auditable) {
+      static auditCommentRequired = true
+      static auditIf = () => false
+      static table = 'posts'
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const m = new GatedModel()
+    m.title = 'gated'
+    await m.save() // must NOT throw
+
+    const audits = await Audit.query().where('auditableType', 'GatedModel')
+    assert.lengthOf(audits, 0)
+  })
+
+  test('auditCommentRequired does NOT throw on no-op update', async ({ assert }) => {
+    class NoOp extends compose(BaseModel, Auditable) {
+      static auditCommentRequired = true
+      static table = 'posts'
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const m = new NoOp()
+    m.title = 'init'
+    m.auditComment = 'first'
+    await m.save() // creates, with comment
+
+    // Re-save without changing anything (no-op update)
+    await m.save() // must NOT throw — nothing changed, no audit
+
+    const updates = await Audit.query().where('auditableType', 'NoOp').where('event', 'updated')
+    assert.lengthOf(updates, 0, 'no update audit should be written for no-op')
+  })
+
+  test('auditCommentRequired DOES throw on update when actual changes happen', async ({
+    assert,
+  }) => {
+    class StrictModel extends compose(BaseModel, Auditable) {
+      static auditCommentRequired = true
+      static table = 'posts'
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const m = new StrictModel()
+    m.title = 'init'
+    m.auditComment = 'first'
+    await m.save()
+
+    m.title = 'changed' // real dirty change
+    await assert.rejects(() => m.save(), /requires an audit comment/)
+  })
+
+  test('auditCommentRequired DOES throw on delete when no comment', async ({ assert }) => {
+    class DeleteStrict extends compose(BaseModel, Auditable) {
+      static auditCommentRequired = true
+      static table = 'posts'
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const m = new DeleteStrict()
+    m.title = 'tbd'
+    m.auditComment = 'init'
+    await m.save()
+
+    // No comment for delete
+    await assert.rejects(() => m.delete(), /requires an audit comment/)
+  })
+})
+
+test.group('Forensics — auditCustom comment integration', (group) => {
+  let app: Awaited<ReturnType<typeof setupApp>>['app']
+  group.each.setup(async () => {
+    ;({ app } = await setupApp())
+    return () => teardownApp(app)
+  })
+
+  test('auditCustom honors model.auditComment', async ({ assert }) => {
+    class Post extends compose(BaseModel, Auditable) {
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const post = await Post.create({ title: 'A' })
+    post.auditComment = 'manual: status changed by support'
+    await post.auditCustom('status-change', {
+      old: { status: 'pending' },
+      new: { status: 'approved' },
+      tags: ['state'],
+    })
+
+    const a = await Audit.query()
+      .where('auditableType', 'Post')
+      .where('event', 'status-change')
+      .firstOrFail()
+
+    assert.equal(a.auditComment, 'manual: status changed by support')
+  })
+
+  test('auditCustom respects auditCommentRequired', async ({ assert }) => {
+    class StrictModel extends compose(BaseModel, Auditable) {
+      static auditCommentRequired = true
+      static table = 'posts'
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const m = new StrictModel()
+    m.title = 'init'
+    m.auditComment = 'init comment'
+    await m.save()
+
+    // Now try auditCustom WITHOUT setting auditComment — should throw
+    await assert.rejects(
+      () => m.auditCustom('approved', { tags: ['state'] }),
+      /requires an audit comment/
+    )
+  })
 })
 
 test.group('Forensics — requestId', (group) => {

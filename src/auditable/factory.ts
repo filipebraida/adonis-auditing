@@ -124,13 +124,23 @@ export function withAuditable() {
       }
 
       async auditCustom(event: string, payload: AuditCustomPayload = {}) {
+        const ctor = this.constructor as typeof ModelWithAudit
+        const comment = this.auditComment ?? null
+
+        if (ctor.auditCommentRequired && !comment) {
+          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), event])
+        }
+
         await this.$writeAudit({
           event,
           oldValues: payload.old ?? null,
           newValues: payload.new ?? null,
           tags: payload.tags ?? null,
           metadata: payload.metadata,
+          auditComment: comment,
         })
+
+        delete (this as any).auditComment
       }
 
       audits() {
@@ -245,17 +255,27 @@ export function withAuditable() {
 
       @afterCreate()
       static async __auditAfterCreate(model: ModelWithAudit) {
+        await ModelWithAudit.#lazyServices()
+
+        // Bail out early if auditing is disabled — no comment check, no audit work.
+        // Mirrors the spirit of withoutAudit: this save is not audited; nothing
+        // audit-related (including the comment-required guard) should run.
+        if (model.$isAuditDisabled || ModelWithAudit.#auditing!.isDisabled()) return
+
         const ctor = model.constructor as typeof ModelWithAudit
         const comment = model.auditComment ?? null
-
-        if (ctor.auditCommentRequired && !comment) {
-          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'created'])
-        }
 
         const filtered = ctor.filterAuditAttributes(model.$attributes)
         const final = await model.$applyGlobalExclude(filtered)
         if (Object.keys(final).length === 0) return
         if (ctor.auditIf && !(await ctor.auditIf(model, 'created'))) return
+
+        // Only enforce the comment requirement when an audit row is actually
+        // about to be written; skip checks above must short-circuit first.
+        if (ctor.auditCommentRequired && !comment) {
+          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'created'])
+        }
+
         await model.$writeAudit({
           event: 'created',
           oldValues: null,
@@ -274,17 +294,17 @@ export function withAuditable() {
 
       @afterUpdate()
       static async __auditAfterUpdate(model: ModelWithAudit) {
+        await ModelWithAudit.#lazyServices()
+
+        // Bail out early if auditing is disabled — see __auditAfterCreate.
+        if (model.$isAuditDisabled || ModelWithAudit.#auditing!.isDisabled()) return
+
         const ctor = model.constructor as typeof ModelWithAudit
         const comment = model.auditComment ?? null
-
-        if (ctor.auditCommentRequired && !comment) {
-          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'updated'])
-        }
 
         const dirtyKeys = model.$auditDirtyKeys
         if (dirtyKeys.length === 0) return
 
-        await ModelWithAudit.#lazyServices()
         const skipList = ModelWithAudit.#auditing!.getSkipIfOnlyChanged()
         if (skipList.length > 0 && dirtyKeys.every((k) => skipList.includes(k))) return
 
@@ -302,6 +322,12 @@ export function withAuditable() {
         if (Object.keys(newFinal).length === 0) return
 
         if (ctor.auditIf && !(await ctor.auditIf(model, 'updated'))) return
+
+        // Only enforce the comment requirement when an audit row is actually
+        // about to be written; skip checks above must short-circuit first.
+        if (ctor.auditCommentRequired && !comment) {
+          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'updated'])
+        }
 
         await model.$writeAudit({
           event: 'updated',
@@ -321,17 +347,25 @@ export function withAuditable() {
 
       @afterDelete()
       static async __auditAfterDelete(model: ModelWithAudit) {
+        await ModelWithAudit.#lazyServices()
+
+        // Bail out early if auditing is disabled — see __auditAfterCreate.
+        if (model.$isAuditDisabled || ModelWithAudit.#auditing!.isDisabled()) return
+
         const ctor = model.constructor as typeof ModelWithAudit
         const comment = model.auditComment ?? null
-
-        if (ctor.auditCommentRequired && !comment) {
-          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'deleted'])
-        }
 
         const filtered = ctor.filterAuditAttributes(model.$auditValuesToSave)
         const final = await model.$applyGlobalExclude(filtered)
         if (Object.keys(final).length === 0) return
         if (ctor.auditIf && !(await ctor.auditIf(model, 'deleted'))) return
+
+        // Only enforce the comment requirement when an audit row is actually
+        // about to be written; skip checks above must short-circuit first.
+        if (ctor.auditCommentRequired && !comment) {
+          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'deleted'])
+        }
+
         await model.$writeAudit({
           event: 'deleted',
           oldValues: final,
