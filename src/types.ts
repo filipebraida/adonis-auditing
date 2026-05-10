@@ -52,6 +52,7 @@ export interface AuditingService {
   getUserForContext(): Promise<{ id: string; type: string } | null>
   getMetadataForContext(): Promise<Record<string, unknown>>
   getTenantForContext(): Promise<string | null>
+  getRequestIdForContext(): Promise<string | null>
   getHiddenFields(): MaskConfig
   getAuditExclude(): string[]
   getSkipIfOnlyChanged(): string[]

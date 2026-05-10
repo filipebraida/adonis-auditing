@@ -138,6 +138,34 @@ await Audit.query().whereRaw(`tags @> ?::jsonb`, [JSON.stringify(['order:42'])])
 
 `auditTags()` may also be `async`, in case you need to await something.
 
+## Audit comments
+
+Attach a human justification to any audit row by setting `model.auditComment` before `.save()`:
+
+```ts
+const customer = await Customer.find(1234)
+customer.email = 'b@y.com'
+customer.auditComment = 'Customer requested correction via ticket #1234'
+await customer.save()
+// audits row stored with audit_comment = 'Customer requested correction via ticket #1234'
+```
+
+The `auditComment` property is transient — it's read once during `$writeAudit`, copied to the audit row, then cleared from the model. A subsequent `.save()` without re-setting `auditComment` produces an audit row with `audit_comment = null`.
+
+Per-model enforcement of comment-on-save (compliance pattern):
+
+```ts
+class BankAccount extends compose(BaseModel, Auditable) {
+  static auditCommentRequired = true
+}
+
+const acct = new BankAccount()
+acct.balance = 1000
+await acct.save() // throws E_AUDIT_COMMENT_MISSING — comment is required
+```
+
+When `auditCommentRequired = true`, all three lifecycle events (created/updated/deleted) require a comment. The check fires before the audit-write logic, so the save aborts before the audit row is attempted. Note: the parent row's INSERT/UPDATE has already committed by the time the check runs in the `@afterCreate`/`@afterUpdate`/`@afterDelete` hook — wrap saves in a Lucid transaction if you need atomic rollback on a missing comment.
+
 ## Skipping audits
 
 ```ts
@@ -226,9 +254,11 @@ The `audits` table:
 | `tags`                     | jsonb, nullable | Array of strings — `['mutation']` for CRUD, plus per-call `auditCustom` tags and any `auditTags()` overrides |
 | `metadata`                 | jsonb, nullable | Bag from resolvers (ip, user-agent, url, ...) plus per-call extras                                           |
 | `tenant_id`                | text, nullable  | SaaS tenant scope. Populated from `tenantResolver` config (HTTP context) or `model.tenantId` fallback        |
+| `audit_comment`            | text, nullable  | Per-write justification (S4). Set `model.auditComment` before `.save()` or via `auditCustom`                 |
+| `request_id`               | text, nullable  | Auto-correlation per HTTP request (A2). Read from `ctx.request.id()` if present                              |
 | `created_at`, `updated_at` | timestamptz     |                                                                                                              |
 
-Indexes: `(auditable_type, auditable_id)`, `(user_type, user_id)`, `(event)`, `(created_at DESC)`, `(tenant_id)`.
+Indexes: `(auditable_type, auditable_id)`, `(user_type, user_id)`, `(event)`, `(created_at DESC)`, `(tenant_id)`, `(request_id)`.
 
 ## Pruning old audits
 
@@ -308,6 +338,28 @@ export default class MyTenantResolver implements TenantResolver {
 ```
 
 When `tenantResolver` returns null (background jobs without HttpContext, or explicit null), the audit's `tenant_id` falls back to the audited model's `tenantId` column if it has one. Models without a `tenantId` column produce audits with `tenant_id = null`.
+
+### Request correlation (`request_id`)
+
+Each audit row stores a `request_id` populated automatically from `ctx.request.id()` when the audit is generated within an HTTP request. To enable AdonisJS's request-id generation, set in your app config:
+
+```ts
+// config/app.ts
+import { defineConfig } from '@adonisjs/core/http'
+
+export default defineConfig({
+  generateRequestId: true,
+  // ... other http config
+})
+```
+
+If you have a load balancer or upstream proxy that already sets `x-request-id`, AdonisJS reads it without needing this config. Audit rows generated outside any HTTP context (background jobs, ace commands, seeders) get `request_id = null`.
+
+Query example: "show me everything one HTTP request changed":
+
+```ts
+const requestAudits = await Audit.query().where('requestId', 'abc-123-...').orderBy('id', 'asc')
+```
 
 ## Troubleshooting
 

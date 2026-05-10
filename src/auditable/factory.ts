@@ -12,6 +12,7 @@ import type { EmitterService } from '@adonisjs/core/types'
 import type { AuditCustomPayload, AuditingService, MaskConfig, MaskStrategy } from '../types.js'
 import type { NormalizeConstructor } from '../utils/normalized_constructor.js'
 import Audit from '../audit.js'
+import { E_AUDIT_COMMENT_MISSING } from '../errors.js'
 
 const FULL_MASK = '******'
 
@@ -82,6 +83,7 @@ export function withAuditable() {
       static auditInclude: string[] = []
       static auditMask: MaskConfig = []
       static auditIf?: (model: any, event: string) => boolean | Promise<boolean>
+      static auditCommentRequired: boolean = false
 
       static resolveAuditableName(): string {
         return this.auditableName ?? this.name
@@ -104,6 +106,8 @@ export function withAuditable() {
       }
 
       $isAuditDisabled = false
+
+      declare auditComment?: string
 
       auditTags(): string[] | Promise<string[]> {
         return []
@@ -178,6 +182,7 @@ export function withAuditable() {
         newValues: Record<string, unknown> | null
         tags?: string[] | null
         metadata?: Record<string, unknown>
+        auditComment?: string | null
       }) {
         await ModelWithAudit.#lazyServices()
         if (this.$isAuditDisabled || ModelWithAudit.#auditing!.isDisabled()) return
@@ -185,6 +190,7 @@ export function withAuditable() {
         const user = await ModelWithAudit.#auditing!.getUserForContext()
         const ctxMeta = await ModelWithAudit.#auditing!.getMetadataForContext()
         const tenantFromCtx = await ModelWithAudit.#auditing!.getTenantForContext()
+        const requestId = await ModelWithAudit.#auditing!.getRequestIdForContext()
 
         const ctor = this.constructor as typeof ModelWithAudit
         const globalMask = ModelWithAudit.#auditing!.getHiddenFields()
@@ -221,6 +227,8 @@ export function withAuditable() {
           const fromModel = (this as any).tenantId
           audit.tenantId = fromModel !== null && fromModel !== undefined ? String(fromModel) : null
         }
+        audit.requestId = requestId
+        audit.auditComment = opts.auditComment ?? null
 
         if (this.$trx) {
           audit.useTransaction(this.$trx)
@@ -238,6 +246,12 @@ export function withAuditable() {
       @afterCreate()
       static async __auditAfterCreate(model: ModelWithAudit) {
         const ctor = model.constructor as typeof ModelWithAudit
+        const comment = model.auditComment ?? null
+
+        if (ctor.auditCommentRequired && !comment) {
+          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'created'])
+        }
+
         const filtered = ctor.filterAuditAttributes(model.$attributes)
         const final = await model.$applyGlobalExclude(filtered)
         if (Object.keys(final).length === 0) return
@@ -247,7 +261,10 @@ export function withAuditable() {
           oldValues: null,
           newValues: final,
           tags: ['mutation'],
+          auditComment: comment,
         })
+
+        delete (model as any).auditComment
       }
 
       @beforeUpdate()
@@ -258,6 +275,12 @@ export function withAuditable() {
       @afterUpdate()
       static async __auditAfterUpdate(model: ModelWithAudit) {
         const ctor = model.constructor as typeof ModelWithAudit
+        const comment = model.auditComment ?? null
+
+        if (ctor.auditCommentRequired && !comment) {
+          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'updated'])
+        }
+
         const dirtyKeys = model.$auditDirtyKeys
         if (dirtyKeys.length === 0) return
 
@@ -285,7 +308,10 @@ export function withAuditable() {
           oldValues: oldFinal,
           newValues: newFinal,
           tags: ['mutation'],
+          auditComment: comment,
         })
+
+        delete (model as any).auditComment
       }
 
       @beforeDelete()
@@ -296,6 +322,12 @@ export function withAuditable() {
       @afterDelete()
       static async __auditAfterDelete(model: ModelWithAudit) {
         const ctor = model.constructor as typeof ModelWithAudit
+        const comment = model.auditComment ?? null
+
+        if (ctor.auditCommentRequired && !comment) {
+          throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'deleted'])
+        }
+
         const filtered = ctor.filterAuditAttributes(model.$auditValuesToSave)
         const final = await model.$applyGlobalExclude(filtered)
         if (Object.keys(final).length === 0) return
@@ -305,7 +337,10 @@ export function withAuditable() {
           oldValues: final,
           newValues: null,
           tags: ['mutation'],
+          auditComment: comment,
         })
+
+        delete (model as any).auditComment
       }
     }
     return ModelWithAudit

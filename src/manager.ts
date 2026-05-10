@@ -68,6 +68,11 @@ export default class AuditingManager implements AuditingService {
     }
   }
 
+  async getRequestIdForContext(): Promise<string | null> {
+    const ctx = HttpContext.get()
+    return ctx?.request.id() ?? null
+  }
+
   getHiddenFields(): MaskConfig {
     return this.config.hiddenFields
   }

@@ -42,6 +42,12 @@ export default class Audit extends BaseModel {
   @column()
   declare tenantId: string | null
 
+  @column()
+  declare auditComment: string | null
+
+  @column()
+  declare requestId: string | null
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 

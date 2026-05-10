@@ -29,3 +29,9 @@ export const E_AUDITABLE_CANNOT_REVERT = createError(
   'E_AUDITABLE_CANNOT_REVERT',
   500
 )
+
+export const E_AUDIT_COMMENT_MISSING = createError<[string, string]>(
+  'adonis-auditing: %s requires an audit comment for %s events. Set model.auditComment before save.',
+  'E_AUDIT_COMMENT_MISSING',
+  400
+)
