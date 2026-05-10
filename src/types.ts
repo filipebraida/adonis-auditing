@@ -57,7 +57,19 @@ export interface AuditingService {
   getAuditExclude(): string[]
   getSkipIfOnlyChanged(): string[]
   isDisabled(): boolean
-  disabled<T>(callback: () => Promise<T>): Promise<T>
+  /**
+   * Suppress auditing within the callback. Audits triggered inside —
+   * lifecycle and custom — are silently skipped. Stack-aware: a nested
+   * `withAuditing(...)` re-enables within its scope. Does NOT bypass
+   * per-model `withoutAudit()`.
+   */
+  withoutAuditing<T>(callback: () => Promise<T>): Promise<T>
+  /**
+   * Force-enable auditing within the callback, escaping a surrounding
+   * `withoutAuditing(...)` scope. The innermost wrapper wins. Does NOT
+   * bypass per-model `withoutAudit()`.
+   */
+  withAuditing<T>(callback: () => Promise<T>): Promise<T>
 }
 
 export interface AuditCustomPayload {

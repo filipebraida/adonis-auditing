@@ -177,10 +177,29 @@ await post.withoutAudit(async () => {
 
 // Globally (e.g., seeders, bulk migrations):
 import auditing from '@filipebraida/adonis-auditing/services/main'
-await auditing.disabled(async () => {
+await auditing.withoutAuditing(async () => {
   await User.createMany(megaSeed)
 })
 ```
+
+For the inverted case — a request that's silenced globally (e.g., an automation API wrapped in `auditing.withoutAuditing(...)` middleware) but needs to record one specific domain event — escape the surrounding scope with `withAuditing(...)`:
+
+```ts
+// SkipAuditMiddleware wraps the whole request in withoutAuditing(),
+// so every save in this controller is silent by default.
+async finalize({ params }: HttpContext) {
+  const intake = await Intake.findOrFail(params.id)
+  intake.status = 'submitted_for_analysis'
+  // ...other silent saves...
+
+  // But this one business event must audit:
+  await auditing.withAuditing(async () => {
+    await intake.save()
+  })
+}
+```
+
+Stack rules apply: the innermost wrapper wins, and `withAuditing` only escapes the AsyncLocalStorage scope — it does not override a per-model `withoutAudit()`, which remains a stronger explicit opt-out.
 
 Declarative skip via a per-model predicate. Receives `(model, event)` where event is `'created' | 'updated' | 'deleted'`. Return `false` to skip the audit row:
 
@@ -383,7 +402,7 @@ export default defineConfig({
 })
 ```
 
-**2. The code genuinely runs outside an HTTP request.** For workers, scripts, or CLI commands, there is no request to attach a user to. Either accept the null-user audit row, or suppress the audit entirely with `auditing.disabled(...)` (see "Skipping audits" above).
+**2. The code genuinely runs outside an HTTP request.** For workers, scripts, or CLI commands, there is no request to attach a user to. Either accept the null-user audit row, or suppress the audit entirely with `auditing.withoutAuditing(...)` (see "Skipping audits" above).
 
 If you want a non-HTTP audit to still record an actor (e.g., a "system" user), use `auditCustom` and write the actor explicitly via `metadata`, since the resolver path requires `HttpContext`.
 

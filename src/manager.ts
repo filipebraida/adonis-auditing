@@ -1,7 +1,7 @@
 import type { AuditingService, MaskConfig, ResolvedAuditingConfig } from './types.js'
 import { HttpContext } from '@adonisjs/core/http'
 import type { LoggerService } from '@adonisjs/core/types'
-import { isDisabled, runDisabled } from './disable_scope.js'
+import { isDisabled, runWithAuditing, runWithoutAuditing } from './disable_scope.js'
 
 export default class AuditingManager implements AuditingService {
   constructor(
@@ -13,8 +13,37 @@ export default class AuditingManager implements AuditingService {
     return isDisabled()
   }
 
-  disabled<T>(callback: () => Promise<T>): Promise<T> {
-    return runDisabled(callback)
+  /**
+   * Suppress auditing within the callback. Any audits triggered inside —
+   * model lifecycle (create/update/delete) and `auditCustom` — are silently
+   * skipped. Useful for seeders, bulk migrations, or automation endpoints
+   * where audit noise has no value.
+   *
+   * Nested `withAuditing(...)` re-enables auditing within a narrower scope.
+   *
+   * Note: this controls the per-scope AsyncLocalStorage flag only. It does
+   * NOT bypass the per-model `withoutAudit()` instance flag, which is a
+   * stronger explicit signal from the calling code and remains independent.
+   */
+  withoutAuditing<T>(callback: () => Promise<T>): Promise<T> {
+    return runWithoutAuditing(callback)
+  }
+
+  /**
+   * Force-enable auditing within the callback, escaping any surrounding
+   * `withoutAuditing(...)` scope. Use sparingly — intended for legitimate
+   * business events that must audit even within bulk-suppressed contexts
+   * (e.g., automation API endpoints that wrap the whole request in
+   * `withoutAuditing()` but still need to record one specific domain event).
+   *
+   * Nested scopes follow stack rules: the innermost wrapper wins.
+   *
+   * Note: this only escapes the SCOPE-level disable. Per-model
+   * `withoutAudit()` is independent and still suppresses audits for that
+   * specific instance.
+   */
+  withAuditing<T>(callback: () => Promise<T>): Promise<T> {
+    return runWithAuditing(callback)
   }
 
   async getUserForContext(): Promise<{ id: string; type: string } | null> {
