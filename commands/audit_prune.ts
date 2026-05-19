@@ -98,12 +98,8 @@ export default class AuditPrune extends BaseCommand {
         const rows = await wrapped
         totalAffected += rows.length
       } else {
-        const rows = await wrapped
-        const ids = rows.map((row: { id: number }) => row.id)
-        if (ids.length > 0) {
-          const deleted = await knex('audits').whereIn('id', ids).delete()
-          totalAffected += Number(deleted) || 0
-        }
+        const deleted = await knex('audits').whereIn('id', wrapped).delete()
+        totalAffected += Number(deleted) || 0
       }
     }
 

@@ -117,6 +117,77 @@ test.group('Forensics — auditComment', (group) => {
     assert.equal(audits[0].auditComment, 'first save comment')
     assert.isNull(audits[1].auditComment)
   })
+
+  test('auditComment is cleared even when $writeAudit throws on create', async ({ assert }) => {
+    class Post extends compose(BaseModel, Auditable) {
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const post = new Post()
+    post.title = 'leak-create'
+    post.auditComment = 'must not leak'
+    ;(post as any).$writeAudit = async () => {
+      throw new Error('forced audit failure')
+    }
+
+    await assert.rejects(() => post.save(), /forced audit failure/)
+    assert.isUndefined((post as any).auditComment)
+  })
+
+  test('auditComment is cleared even when $writeAudit throws on update', async ({ assert }) => {
+    class Post extends compose(BaseModel, Auditable) {
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const post = await Post.create({ title: 'init' })
+    post.title = 'changed'
+    post.auditComment = 'must not leak'
+    ;(post as any).$writeAudit = async () => {
+      throw new Error('forced audit failure')
+    }
+
+    await assert.rejects(() => post.save(), /forced audit failure/)
+    assert.isUndefined((post as any).auditComment)
+  })
+
+  test('auditComment is cleared even when $writeAudit throws on delete', async ({ assert }) => {
+    class Post extends compose(BaseModel, Auditable) {
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const post = await Post.create({ title: 'to-delete' })
+    post.auditComment = 'must not leak'
+    ;(post as any).$writeAudit = async () => {
+      throw new Error('forced audit failure')
+    }
+
+    await assert.rejects(() => post.delete(), /forced audit failure/)
+    assert.isUndefined((post as any).auditComment)
+  })
+
+  test('auditComment is cleared even when $writeAudit throws on auditCustom', async ({
+    assert,
+  }) => {
+    class Post extends compose(BaseModel, Auditable) {
+      @column({ isPrimary: true }) declare id: number
+      @column() declare title: string
+    }
+
+    const post = await Post.create({ title: 'custom' })
+    post.auditComment = 'must not leak'
+    ;(post as any).$writeAudit = async () => {
+      throw new Error('forced audit failure')
+    }
+
+    await assert.rejects(
+      () => post.auditCustom('viewed', { tags: ['view'] }),
+      /forced audit failure/
+    )
+    assert.isUndefined((post as any).auditComment)
+  })
 })
 
 test.group('Forensics — auditCommentRequired enforcement', (group) => {

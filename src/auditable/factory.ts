@@ -131,16 +131,18 @@ export function withAuditable() {
           throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), event])
         }
 
-        await this.$writeAudit({
-          event,
-          oldValues: payload.old ?? null,
-          newValues: payload.new ?? null,
-          tags: payload.tags ?? null,
-          metadata: payload.metadata,
-          auditComment: comment,
-        })
-
-        delete (this as any).auditComment
+        try {
+          await this.$writeAudit({
+            event,
+            oldValues: payload.old ?? null,
+            newValues: payload.new ?? null,
+            tags: payload.tags ?? null,
+            metadata: payload.metadata,
+            auditComment: comment,
+          })
+        } finally {
+          delete (this as any).auditComment
+        }
       }
 
       audits() {
@@ -276,15 +278,17 @@ export function withAuditable() {
           throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'created'])
         }
 
-        await model.$writeAudit({
-          event: 'created',
-          oldValues: null,
-          newValues: final,
-          tags: ['mutation'],
-          auditComment: comment,
-        })
-
-        delete (model as any).auditComment
+        try {
+          await model.$writeAudit({
+            event: 'created',
+            oldValues: null,
+            newValues: final,
+            tags: ['mutation'],
+            auditComment: comment,
+          })
+        } finally {
+          delete (model as any).auditComment
+        }
       }
 
       @beforeUpdate()
@@ -329,15 +333,17 @@ export function withAuditable() {
           throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'updated'])
         }
 
-        await model.$writeAudit({
-          event: 'updated',
-          oldValues: oldFinal,
-          newValues: newFinal,
-          tags: ['mutation'],
-          auditComment: comment,
-        })
-
-        delete (model as any).auditComment
+        try {
+          await model.$writeAudit({
+            event: 'updated',
+            oldValues: oldFinal,
+            newValues: newFinal,
+            tags: ['mutation'],
+            auditComment: comment,
+          })
+        } finally {
+          delete (model as any).auditComment
+        }
       }
 
       @beforeDelete()
@@ -366,15 +372,17 @@ export function withAuditable() {
           throw new E_AUDIT_COMMENT_MISSING([ctor.resolveAuditableName(), 'deleted'])
         }
 
-        await model.$writeAudit({
-          event: 'deleted',
-          oldValues: final,
-          newValues: null,
-          tags: ['mutation'],
-          auditComment: comment,
-        })
-
-        delete (model as any).auditComment
+        try {
+          await model.$writeAudit({
+            event: 'deleted',
+            oldValues: final,
+            newValues: null,
+            tags: ['mutation'],
+            auditComment: comment,
+          })
+        } finally {
+          delete (model as any).auditComment
+        }
       }
     }
     return ModelWithAudit
